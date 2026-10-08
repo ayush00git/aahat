@@ -41,6 +41,10 @@ class Scene:
     @classmethod
     def from_item(cls, item: Item) -> Scene:
         p = item.properties
+        # Earth Search sets earthsearch:boa_offset_applied when it has already removed the
+        # processing-baseline-04.00 BOA offset from the pixels, yet still advertises offset -0.1
+        # in raster:bands. Applying it twice drives dark water negative, so honour the flag.
+        offset_applied = bool(p.get("earthsearch:boa_offset_applied", False))
         hrefs, scale, offset = {}, {}, {}
         for key in (*BANDS.values(), *RGB):
             asset = item.assets.get(key)
@@ -49,7 +53,7 @@ class Scene:
             hrefs[key] = asset.href
             rb = (asset.extra_fields.get("raster:bands") or [{}])[0]
             scale[key] = float(rb.get("scale", 0.0001 if key != "scl" else 1))
-            offset[key] = float(rb.get("offset", 0.0))
+            offset[key] = 0.0 if offset_applied else float(rb.get("offset", 0.0))
         return cls(
             item_id=item.id,
             day=item.datetime.date(),
