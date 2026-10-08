@@ -1,0 +1,82 @@
+[
+  {
+    "id": "gepang-gath",
+    "name": "Gepang Gath",
+    "name_hi": "घेपन घाट झील",
+    "lat": 32.5,
+    "lon": 77.2,
+    "aoi_radius_m": 3000,
+    "district": "Lahaul and Spiti",
+    "basin": "Chandra (Chenab)",
+    "kind": "proglacial",
+    "notes": "Named among critical hotspots in the MHA GLOF review (Sept 2026) and among nine rapidly expanding lakes in the IIT Mandi study. Seed point is approximate; refined from imagery.",
+    "sources": [
+      "https://argusenglish.in/weather-calamities/195-glof-ticking-in-india-govt-pulls-up-socks-for-202730-risk-window-special-report",
+      "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal"
+    ]
+  },
+  {
+    "id": "samudra-tapu",
+    "name": "Samudra Tapu",
+    "name_hi": "समुद्र टापू झील",
+    "lat": 32.499,
+    "lon": 77.548,
+    "aoi_radius_m": 3000,
+    "district": "Lahaul and Spiti",
+    "basin": "Chandra (Chenab)",
+    "kind": "proglacial",
+    "notes": "Seed from OSM way 252201656 (Samudri Tapu).",
+    "sources": [
+      "https://argusenglish.in/weather-calamities/195-glof-ticking-in-india-govt-pulls-up-socks-for-202730-risk-window-special-report",
+      "https://www.openstreetmap.org/way/252201656"
+    ]
+  },
+  {
+    "id": "chandra-tal",
+    "name": "Chandra Tal",
+    "name_hi": "चंद्रताल",
+    "lat": 32.4825,
+    "lon": 77.6146,
+    "aoi_radius_m": 1500,
+    "district": "Lahaul and Spiti",
+    "basin": "Chandra (Chenab)",
+    "kind": "moraine-dammed",
+    "notes": "Seed from OSM way 40003601.",
+    "sources": [
+      "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal",
+      "https://www.openstreetmap.org/way/40003601"
+    ]
+  },
+  {
+    "id": "kya-tso",
+    "name": "Kya Tso",
+    "name_hi": "क्या त्सो",
+    "lat": 32.7219,
+    "lon": 77.413,
+    "aoi_radius_m": 1500,
+    "district": "Lahaul and Spiti",
+    "basin": "Bhaga (Chenab)",
+    "kind": "glacial",
+    "notes": "Seed from OSM way 842692655.",
+    "sources": [
+      "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal",
+      "https://www.openstreetmap.org/way/842692655"
+    ]
+  },
+  {
+    "id": "kali-kund",
+    "name": "Kalikund",
+    "name_hi": "काली कुंड",
+    "lat": 32.3235,
+    "lon": 76.371,
+    "aoi_radius_m": 1000,
+    "district": "Kangra / Chamba",
+    "basin": "Ravi",
+    "kind": "glacial",
+    "notes": "Seed from OSM way 286534602. IIT Mandi flagged steep surrounding slopes.",
+    "sources": [
+      "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal",
+      "https://www.openstreetmap.org/way/286534602"
+    ]
+  }
+]
