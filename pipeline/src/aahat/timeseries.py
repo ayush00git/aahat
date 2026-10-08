@@ -13,7 +13,7 @@ from shapely.geometry import mapping
 from .dem import Terrain
 from .geo import grid_around, point_in_crs, to_wgs84
 from .lakes import Lake
-from .stac import Scene, find_scenes
+from .stac import find_scenes
 from .water import Composite, LakeExtent, WaterParams, composite, extract_lake
 
 log = logging.getLogger(__name__)
@@ -44,12 +44,6 @@ class LakeYear:
     params: dict
 
 
-def pick_scenes(scenes: list[Scene], max_scenes: int) -> list[Scene]:
-    """Least-cloudy scenes, kept in date order."""
-    best = sorted(scenes, key=lambda s: s.cloud_cover)[:max_scenes]
-    return sorted(best, key=lambda s: s.day)
-
-
 def lake_year(
     lake: Lake, year: int, terrain: Terrain, p: WaterParams = WaterParams(), max_scenes: int = 12
 ) -> tuple[LakeYear, Composite | None, LakeExtent | None]:
@@ -57,18 +51,18 @@ def lake_year(
     aoi = to_wgs84(grid.polygon(), grid.crs)
     start, end = season(year)
     found = find_scenes(aoi, start, min(end, datetime.now(UTC).date()))
-    scenes = pick_scenes(found, max_scenes)
-    log.info("%s %d: %d scenes found, using %d", lake.id, year, len(found), len(scenes))
-    if not scenes:
+    log.info("%s %d: %d candidate scenes", lake.id, year, len(found))
+    if not found:
         return LakeYear(lake.id, year, "no_data", None, None, None, None, 0, 0, None, None, asdict(p)), None, None
-    comp = composite(scenes, grid, terrain, p)
-    used = [o for o in comp.scenes if o.clear_fraction > 0.05]
+    comp = composite(found, grid, terrain, p, max_scenes=max_scenes)
+    used = comp.inputs
+    if not used:
+        return LakeYear(lake.id, year, "no_data", None, None, None, None, len(found), 0, None, None, asdict(p)), None, None
     seed = point_in_crs(lake.lon, lake.lat, grid.crs)
     ext = extract_lake(comp, seed, p)
-    days = (scenes[0].day.isoformat(), scenes[-1].day.isoformat())
+    days = (used[0].day.isoformat(), used[-1].day.isoformat())
     if ext is None:
-        status = "not_found" if used else "no_data"
-        return LakeYear(lake.id, year, status, None, None, None, None, len(found), len(used), *days, asdict(p)), comp, None
+        return LakeYear(lake.id, year, "not_found", None, None, None, None, len(found), len(used), *days, asdict(p)), comp, None
     status = "ok" if ext.coverage >= 0.9 else "partial"
     rec = LakeYear(
         lake.id,

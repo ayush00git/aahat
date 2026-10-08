@@ -3,13 +3,13 @@
     "id": "gepang-gath",
     "name": "Gepang Gath",
     "name_hi": "घेपन घाट झील",
-    "lat": 32.5,
-    "lon": 77.2,
+    "lat": 32.5237,
+    "lon": 77.2218,
     "aoi_radius_m": 3000,
     "district": "Lahaul and Spiti",
     "basin": "Chandra (Chenab)",
     "kind": "proglacial",
-    "notes": "Named among critical hotspots in the MHA GLOF review (Sept 2026) and among nine rapidly expanding lakes in the IIT Mandi study. Seed point is approximate; refined from imagery.",
+    "notes": "Named among critical hotspots in the MHA GLOF review (Sept 2026) and among nine rapidly expanding lakes in the IIT Mandi study. Seed point located from 2025 Sentinel-2 imagery with `aahat discover`.",
     "sources": [
       "https://argusenglish.in/weather-calamities/195-glof-ticking-in-india-govt-pulls-up-socks-for-202730-risk-window-special-report",
       "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal"

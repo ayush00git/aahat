@@ -36,11 +36,14 @@ SCL_UNUSABLE = (0, 1, 3, 8, 9, 10, 11)  # nodata, saturated, cloud shadow, cloud
 
 @dataclass(frozen=True)
 class WaterParams:
-    ndwi_min: float = 0.10
-    mndwi_min: float = 0.20
+    # Calibrated on Gepang Gath, 2025: lake NDWI ~0.8-1.0 and MNDWI 5th pct 0.43; bare land
+    # NDWI 99th pct 0.05; glacier ice has high MNDWI but NDWI mostly < 0.1.
+    ndwi_min: float = 0.30
+    mndwi_min: float = 0.30
     max_slope_deg: float = 25.0
     min_obs: int = 2
     min_freq: float = 0.5
+    close_px: int = 2  # bridge brash ice and iceberg strings up to ~2*close_px pixels wide
 
 
 @dataclass
@@ -67,11 +70,13 @@ def _reflectance(scene: Scene, key: str, grid: Grid, resampling=Resampling.bilin
     return dn * scene.scale[key] + scene.offset[key]
 
 
-def observe(scene: Scene, grid: Grid, terrain: Terrain, p: WaterParams) -> SceneObs:
+def read_clear(scene: Scene, grid: Grid) -> np.ndarray:
+    """Clear-sky, snow-free mask from the cheap 20 m SCL band."""
     scl = read_to_grid(scene.hrefs["scl"], grid, Resampling.nearest, dtype="uint8", nodata=0)
-    clear = ~np.isin(scl, SCL_UNUSABLE)
-    if clear.mean() < 0.05:  # skip the band reads for a fully cloudy/snowy AOI
-        return SceneObs(scene.day, scene.item_id, clear, np.zeros_like(clear), float(clear.mean()))
+    return ~np.isin(scl, SCL_UNUSABLE)
+
+
+def observe(scene: Scene, clear: np.ndarray, grid: Grid, terrain: Terrain, p: WaterParams) -> SceneObs:
     green = _reflectance(scene, "green", grid)
     nir = _reflectance(scene, "nir", grid)
     swir = _reflectance(scene, "swir16", grid)
@@ -85,10 +90,23 @@ def observe(scene: Scene, grid: Grid, terrain: Terrain, p: WaterParams) -> Scene
 
 
 def composite(
-    scenes: list[Scene], grid: Grid, terrain: Terrain, p: WaterParams = WaterParams(), workers: int = 6
+    scenes: list[Scene],
+    grid: Grid,
+    terrain: Terrain,
+    p: WaterParams = WaterParams(),
+    max_scenes: int = 12,
+    min_clear: float = 0.2,
+    workers: int = 6,
 ) -> Composite:
+    """Rank candidate scenes by how clear the AOI actually is (SCL), then map water on the best few."""
     with ThreadPoolExecutor(workers) as pool:
-        obs = list(pool.map(lambda s: observe(s, grid, terrain, p), scenes))
+        clears = list(pool.map(lambda s: read_clear(s, grid), scenes))
+    ranked = sorted(zip(scenes, clears), key=lambda sc: -sc[1].mean())
+    chosen = [(s, c) for s, c in ranked if c.mean() >= min_clear][:max_scenes]
+    chosen.sort(key=lambda sc: sc[0].day)
+    log.info("%d/%d scenes clear enough; using %d", sum(c.mean() >= min_clear for c in clears), len(scenes), len(chosen))
+    with ThreadPoolExecutor(workers) as pool:
+        obs = list(pool.map(lambda sc: observe(sc[0], sc[1], grid, terrain, p), chosen))
     obs_count = np.zeros(grid.shape, dtype="int16")
     water_count = np.zeros(grid.shape, dtype="int16")
     for o in obs:
@@ -97,7 +115,7 @@ def composite(
     with np.errstate(divide="ignore", invalid="ignore"):
         freq = np.where(obs_count > 0, water_count / obs_count, np.nan).astype("float32")
     water = (obs_count >= p.min_obs) & (freq >= p.min_freq) & (terrain.slope <= p.max_slope_deg)
-    return Composite(grid, water, obs_count, freq, obs, list(scenes))
+    return Composite(grid, water, obs_count, freq, obs, [s for s, _ in chosen])
 
 
 @dataclass
@@ -125,7 +143,12 @@ def extract_lake(comp: Composite, seed_xy: tuple[float, float], p: WaterParams, 
         return None
     sizes = ndimage.sum_labels(np.ones_like(labels), labels, near)
     lake = labels == near[int(np.argmax(sizes))]
-    lake = ndimage.binary_fill_holes(lake)  # icebergs and floating ice belong to the lake
+    # Icebergs and brash ice at a calving front belong to the lake: close narrow gaps, fill holes.
+    if p.close_px:
+        pad = p.close_px + 1
+        closed = ndimage.binary_closing(np.pad(lake, pad), ndimage.generate_binary_structure(2, 1), p.close_px)
+        lake = closed[pad:-pad, pad:-pad]
+    lake = ndimage.binary_fill_holes(lake)
     polys = [shape(g) for g, v in features.shapes(lake.astype("uint8"), mask=lake, transform=grid.transform) if v == 1]
     poly = unary_union(polys)
     area = float(lake.sum()) * grid.pixel_area_m2()

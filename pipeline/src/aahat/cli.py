@@ -14,7 +14,7 @@ from shapely.geometry import Point
 from .dem import Terrain
 from .geo import grid_around, to_wgs84
 from .lakes import get_lake, load_lakes
-from .timeseries import FIRST_YEAR, pick_scenes, run_lake, season
+from .timeseries import FIRST_YEAR, run_lake, season
 from .water import WaterParams, composite
 
 
@@ -45,8 +45,8 @@ def cmd_discover(args) -> None:
     grid = grid_around(args.lon, args.lat, args.radius)
     terrain = Terrain(grid)
     start, end = season(args.year)
-    scenes = pick_scenes(find_scenes(to_wgs84(grid.polygon(), grid.crs), start, end), args.max_scenes)
-    comp = composite(scenes, grid, terrain, WaterParams())
+    scenes = find_scenes(to_wgs84(grid.polygon(), grid.crs), start, end)
+    comp = composite(scenes, grid, terrain, WaterParams(), max_scenes=args.max_scenes)
     labels, n = ndimage.label(comp.water, structure=np.ones((3, 3)))
     if n == 0:
         print("no water found")
