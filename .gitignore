@@ -1,0 +1,24 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# pipeline outputs (published to S3, not git)
+pipeline/out/
+*.tif
+
+# node
+node_modules/
+dist/
+.vite/
+
+# go
+bin/
+
+# aws / cdk
+cdk.out/
+.aws-sam/
+.env
+.env.*
