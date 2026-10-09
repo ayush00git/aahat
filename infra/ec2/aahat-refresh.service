@@ -1,0 +1,8 @@
+[Unit]
+Description=Aahat pipeline refresh (new Sentinel-2 scenes -> risk -> downstream)
+After=network-online.target
+[Service]
+Type=oneshot
+User=aahat
+ExecStart=/srv/aahat/bin/refresh.sh
+TimeoutStartSec=3h

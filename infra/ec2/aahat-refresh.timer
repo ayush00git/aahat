@@ -1,0 +1,7 @@
+[Unit]
+Description=Weekly Aahat pipeline refresh
+[Timer]
+OnCalendar=Mon *-*-* 02:00:00 UTC
+Persistent=true
+[Install]
+WantedBy=timers.target
