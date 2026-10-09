@@ -1,15 +1,22 @@
 #!/bin/bash
-# Runs ON the server (systemd timer, weekly): pick up new Sentinel-2 scenes for the current season and
-# recompute risk, downstream impacts and the index, in place in the directory the API serves.
+# Runs ON the server (systemd timer, every 2 days): pick up new Sentinel-2 scenes for the current season,
+# recompute risk, downstream impacts, the index and the place list, and scan for new barrier lakes, in
+# place in the directory the API serves.
 set -euo pipefail
 export HOME=/srv/aahat AAHAT_CACHE_DIR=/srv/aahat/cache
 cd /srv/aahat/pipeline
 YEAR=$(date -u +%Y)
 OUT=/srv/aahat/data
-for lake in $(/srv/aahat/.local/bin/uv run --frozen python -c "from aahat.lakes import load_lakes; print(' '.join(l.id for l in load_lakes()))"); do
+LAKES=$(/srv/aahat/.local/bin/uv run --frozen python -c "from aahat.lakes import load_lakes; print(' '.join(l.id for l in load_lakes()))")
+for lake in $LAKES; do
   /srv/aahat/.local/bin/uv run --frozen aahat series --lake "$lake" --years "$YEAR" --max-scenes 10 --out "$OUT" || echo "series failed: $lake"
 done
 /srv/aahat/.local/bin/uv run --frozen aahat risk --lake all --out "$OUT"
 /srv/aahat/.local/bin/uv run --frozen aahat downstream --lake all --out "$OUT"
 /srv/aahat/.local/bin/uv run --frozen aahat summary --out "$OUT"
+/srv/aahat/.local/bin/uv run --frozen aahat places --out "$OUT"
+# New barrier (landslide-dammed) lakes on the first 60 km below each monitored lake
+for lake in $LAKES; do
+  /srv/aahat/.local/bin/uv run --frozen aahat barrier --lake "$lake" --max-km 60 --out "$OUT" || echo "barrier scan failed: $lake"
+done
 echo "refreshed $(date -u +%FT%TZ)"

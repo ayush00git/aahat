@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ship the Python pipeline to the server with uv and a weekly refresh timer.
+# Ship the Python pipeline to the server with uv and its refresh timer (every 2 days).
 set -euo pipefail
 cd "$(dirname "$0")"
 source ./config.sh

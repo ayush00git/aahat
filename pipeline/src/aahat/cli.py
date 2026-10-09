@@ -96,9 +96,18 @@ def cmd_barrier(args) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     result = {"reach": name, "as_of": as_of.isoformat(), "candidates": candidates_json(cands)}
     (out_dir / f"{name}_{as_of.isoformat()}.json").write_text(json.dumps(result, indent=1))
+    (out_dir / f"{name}_latest.json").write_text(json.dumps(result, indent=1))  # what the API serves
     print(f"{name} as of {as_of}: {len(cands)} new-water candidate(s)")
     for c in cands:
         print(f"  km {c.km_along_reach:6.1f}  {c.lat:.4f},{c.lon:.4f}  {c.area_m2 / 1e6:.3f} km2  width {c.width_m} m")
+
+
+def cmd_places(args) -> None:
+    from .places import build_places
+
+    path = build_places(Path(args.out))
+    n = len(json.loads(path.read_text())["places"])
+    print(f"{n} searchable places -> {path}")
 
 
 def cmd_summary(args) -> None:
@@ -182,6 +191,10 @@ def main(argv: list[str] | None = None) -> None:
     b.add_argument("--max-km", type=float, default=None)
     b.add_argument("--out", default="out")
     b.set_defaults(func=cmd_barrier)
+
+    pl = sub.add_parser("places", help="index every named settlement in the region for search")
+    pl.add_argument("--out", default="out")
+    pl.set_defaults(func=cmd_places)
 
     m = sub.add_parser("summary", help="table of all lake series; writes lakes/index.json")
     m.add_argument("--out", default="out")

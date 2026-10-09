@@ -13,11 +13,11 @@ func TestPlacesSearch(t *testing.T) {
 		q    string
 		want []string // names, in order
 	}{
-		{"bhi", []string{"Bhiyari"}},           // in both lakes: listed once
-		{"YAM", []string{"Yamling"}},           // case-insensitive; outside places are searchable
-		{"उदय", []string{"Udaipur"}},           // Hindi name
-		{"pur", []string{"Udaipur"}},           // substring; the school "..., Udaipur" is not a settlement
-		{"ch", []string{"Chhatru", "Kurched"}}, // prefix matches before substring matches
+		{"bhi", []string{"Bhiyari", "Bhiyara"}},             // in both lakes: listed once
+		{"YAM", []string{"Yamling"}},             // case-insensitive; outside places are searchable
+		{"उदय", []string{"Udaipur"}},             // Hindi name
+		{"pur", []string{"Udaipur", "Hamirpur"}}, // substring; covered Udaipur first, then region-wide Hamirpur; the school "..., Udaipur" is not a settlement
+		{"ch", []string{"Chhatru", "Kurched"}},   // prefix matches before substring matches
 		{"zzz", []string{}},
 	}
 	for _, tc := range tests {
@@ -100,5 +100,29 @@ func TestPlaceThreatsSortedByArrival(t *testing.T) {
 	got := decode[threatsResponse](t, env.do(t, "GET", "/places/node/8624123539/threats", nil))
 	if len(got.Threats) != 2 || got.Threats[0].LakeID != "samudra-tapu" || got.Threats[1].LakeID != "gepang-gath" {
 		t.Errorf("got %+v", got.Threats)
+	}
+}
+
+func TestSearchCoversRegionAndRanksCoveredFirst(t *testing.T) {
+	env := newEnv(t, nil)
+	got := decode[[]placeResult](t, env.do(t, "GET", "/places/search?q=hamir", nil))
+	if len(got) != 1 || *got[0].Name != "Hamirpur" || got[0].Covered {
+		t.Fatalf("hamirpur: %+v", got)
+	}
+	got = decode[[]placeResult](t, env.do(t, "GET", "/places/search?q=bhiyar", nil))
+	if len(got) != 2 || *got[0].Name != "Bhiyari" || !got[0].Covered || got[1].Covered {
+		t.Fatalf("covered first, analysed place not duplicated: %+v", got)
+	}
+	got = decode[[]placeResult](t, env.do(t, "GET", "/places/search?q=हमीर", nil))
+	if len(got) != 1 || got[0].OSM != "node/1522750710" {
+		t.Fatalf("hindi: %+v", got)
+	}
+}
+
+func TestThreatsForUncoveredPlaceNameItButStayUnknown(t *testing.T) {
+	env := newEnv(t, nil)
+	got := decode[threatsResponse](t, env.do(t, "GET", "/places/node/1522750710/threats", nil))
+	if got.Known || !got.Safe || got.Name == nil || *got.Name != "Hamirpur" || got.Lat == nil || len(got.Threats) != 0 {
+		t.Fatalf("got %+v", got)
 	}
 }

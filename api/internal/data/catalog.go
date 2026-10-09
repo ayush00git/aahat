@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 const indexKey = "lakes/index.json"
@@ -15,6 +16,10 @@ const indexKey = "lakes/index.json"
 // the underlying DataStore is expected to be cached.
 type Catalog struct {
 	src DataStore
+
+	mu        sync.Mutex // guards the parsed places index
+	places    []Place
+	placesRaw []byte
 }
 
 func NewCatalog(src DataStore) *Catalog { return &Catalog{src: src} }
@@ -143,4 +148,41 @@ func LayerFile(name string) (string, bool) {
 		return name + ".geojson", true
 	}
 	return "", false
+}
+
+const placesKey = "places/index.json"
+
+// Place is a named settlement from the region-wide index (pipeline: aahat places).
+type Place struct {
+	OSM    string  `json:"osm"`
+	Name   string  `json:"name"`
+	NameHi *string `json:"name_hi"`
+	Place  string  `json:"place"`
+	Lon    float64 `json:"lon"`
+	Lat    float64 `json:"lat"`
+}
+
+// Places returns every searchable settlement, or an empty list if the index is not published yet.
+// The parsed list is reused while the underlying bytes are unchanged (the store caches them).
+func (c *Catalog) Places(ctx context.Context) ([]Place, error) {
+	b, err := c.src.Get(ctx, placesKey)
+	if errors.Is(err, ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(b) > 0 && len(c.placesRaw) == len(b) && &c.placesRaw[0] == &b[0] {
+		return c.places, nil
+	}
+	var doc struct {
+		Places []Place `json:"places"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		return nil, fmt.Errorf("places index: %w", err)
+	}
+	c.places, c.placesRaw = doc.Places, b
+	return c.places, nil
 }

@@ -17,6 +17,8 @@ type placeResult struct {
 	NameHi *string `json:"name_hi"`
 	Lon    float64 `json:"lon"`
 	Lat    float64 `json:"lat"`
+	// Covered is true when at least one monitored lake's analysis includes the place.
+	Covered bool `json:"covered"`
 }
 
 // searchPlaces finds settlements by English or Hindi name across every lake's
@@ -33,29 +35,49 @@ func (s *server) searchPlaces(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "lake index not published yet")
 		return
 	}
-	var prefix, contains []placeResult
-	seen := map[string]bool{}
+	places, err := s.catalog.Places(r.Context())
+	if err != nil {
+		s.fail(w, r, err, "")
+		return
+	}
+	// Candidates: the analysed settlements (covered), then every other named place in the region.
+	var cands []placeResult
+	covered := map[string]bool{}
 	for _, li := range all {
 		for _, im := range li.Impacts {
-			if im.Kind != data.KindSettlement || seen[im.OSM] {
+			if im.Kind != data.KindSettlement || covered[im.OSM] {
 				continue
 			}
-			name, nameHi := strings.ToLower(data.Str(im.Name)), strings.ToLower(data.Str(im.NameHi))
-			res := placeResult{OSM: im.OSM, Name: im.Name, NameHi: im.NameHi, Lon: im.Lon, Lat: im.Lat}
-			switch {
-			case strings.HasPrefix(name, q) || strings.HasPrefix(nameHi, q):
-				prefix = append(prefix, res)
-			case strings.Contains(name, q) || strings.Contains(nameHi, q):
-				contains = append(contains, res)
-			default:
-				continue
-			}
-			seen[im.OSM] = true
+			covered[im.OSM] = true
+			cands = append(cands, placeResult{OSM: im.OSM, Name: im.Name, NameHi: im.NameHi, Lon: im.Lon, Lat: im.Lat, Covered: true})
 		}
 	}
-	out := append(prefix, contains...)
-	if out == nil {
-		out = []placeResult{}
+	for _, p := range places {
+		if !covered[p.OSM] {
+			name := p.Name
+			cands = append(cands, placeResult{OSM: p.OSM, Name: &name, NameHi: p.NameHi, Lon: p.Lon, Lat: p.Lat})
+		}
+	}
+	// Rank: name prefix before substring; covered places first within each.
+	var buckets [4][]placeResult
+	for _, c := range cands {
+		name, nameHi := strings.ToLower(data.Str(c.Name)), strings.ToLower(data.Str(c.NameHi))
+		rank := 0
+		switch {
+		case strings.HasPrefix(name, q) || strings.HasPrefix(nameHi, q):
+		case strings.Contains(name, q) || strings.Contains(nameHi, q):
+			rank = 2
+		default:
+			continue
+		}
+		if !c.Covered {
+			rank++
+		}
+		buckets[rank] = append(buckets[rank], c)
+	}
+	out := []placeResult{}
+	for _, b := range buckets {
+		out = append(out, b...)
 	}
 	writeJSON(w, http.StatusOK, out[:min(len(out), maxSearchResults)])
 }
@@ -134,6 +156,20 @@ func (s *server) placeThreats(w http.ResponseWriter, r *http.Request) {
 				resp.Threats = append(resp.Threats, newThreat(li.Lake, im))
 			}
 			break // one row per lake (the nearest, as the file is nearest-first)
+		}
+	}
+	if !resp.Known { // not analysed for any lake: still say where it is, from the region index
+		places, err := s.catalog.Places(r.Context())
+		if err != nil {
+			s.fail(w, r, err, "")
+			return
+		}
+		for _, p := range places {
+			if p.OSM == osm {
+				name, lon, lat := p.Name, p.Lon, p.Lat
+				resp.Name, resp.NameHi, resp.Lon, resp.Lat = &name, p.NameHi, &lon, &lat
+				break
+			}
 		}
 	}
 	sortThreats(resp.Threats)

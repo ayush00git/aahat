@@ -7,6 +7,7 @@ cd infra/ec2
 ./provision.sh                 # key pair, security group, IAM role (Polly + SNS), t4g.small, Elastic IP
 ./deploy.sh                    # build + ship API, web apps and pipeline results; restart services
 AAHAT_SMS=sns ./deploy.sh      # same, with SMS through Amazon SNS turned on
+./deploy-pipeline.sh           # ship the pipeline + refresh timer (runs on the server every 2 days)
 ./teardown.sh                  # delete it all
 ```
 
@@ -22,3 +23,7 @@ AAHAT_SMS=sns ./deploy.sh      # same, with SMS through Amazon SNS turned on
 - SMS via SNS starts in the sandbox: only verified numbers receive messages
   (`aws sns create-sms-sandbox-phone-number --phone-number +91...`, then `verify-sms-sandbox-phone-number`
   with the OTP), with a $1/month default spend limit.
+
+- The pipeline runs on the server: `systemctl list-timers aahat-refresh.timer`, logs with
+  `journalctl -u aahat-refresh`, start one now with `sudo systemctl start aahat-refresh`. It writes to
+  `/srv/aahat/data` (lakes, places, barrier scans), which the API serves.
