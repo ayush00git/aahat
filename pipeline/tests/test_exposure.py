@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from aahat import exposure
 from aahat.exposure import assets_geojson, classify, fetch_assets, overpass_query, parse_overpass, query_key
@@ -137,8 +138,11 @@ def test_geojson():
 
 
 def test_fetch_reads_disk_cache_without_network(tmp_path, monkeypatch):
+    import aahat.osm_extract
+
     bounds = (77.10, 32.40, 77.30, 32.55)
     monkeypatch.setattr(exposure, "cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(aahat.osm_extract, "covers", lambda b, url=None: False)  # exercise the Overpass cache
 
     def no_network(*args, **kwargs):
         raise AssertionError("network used")
@@ -150,3 +154,39 @@ def test_fetch_reads_disk_cache_without_network(tmp_path, monkeypatch):
     path.write_text(json.dumps(fake_overpass()))
     assets = fetch_assets(bounds)
     assert len(assets) == 10
+
+
+def test_fetch_assets_prefers_local_extract_when_it_covers_the_box(tmp_path, monkeypatch):
+    import json as _json
+
+    import aahat.cache
+    import aahat.exposure as ex
+    import aahat.osm_extract as ox
+
+    monkeypatch.setattr(aahat.cache, "cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(ox, "cache_dir", lambda: tmp_path)
+    ox._load.cache_clear()
+    filtered = tmp_path / "osm" / f"extract_{Path(ox.EXTRACT_URL).stem}.json"
+    filtered.parent.mkdir(parents=True)
+    elements = [
+        {"type": "node", "id": 1, "lat": 32.48, "lon": 77.12, "tags": {"place": "village", "name": "Sissu"}},
+        {"type": "node", "id": 2, "lat": 31.10, "lon": 77.17, "tags": {"place": "town", "name": "Shimla"}},
+        {
+            "type": "way",
+            "id": 3,
+            "tags": {"highway": "trunk", "bridge": "yes", "name": "Manali-Leh"},
+            "geometry": [{"lat": 32.47, "lon": 77.12}, {"lat": 32.471, "lon": 77.121}],
+        },
+    ]
+    filtered.write_text(
+        _json.dumps({"source": ox.EXTRACT_URL, "bounds": [72.0, 28.0, 81.0, 37.0], "elements": elements})
+    )
+
+    def no_network(*a, **k):
+        raise AssertionError("must not call Overpass")
+
+    monkeypatch.setattr(ex, "_post_overpass", no_network)
+    assets = ex.fetch_assets((77.0, 32.4, 77.3, 32.6))
+    assert sorted(a.name for a in assets) == ["Manali-Leh", "Sissu"]
+    assert not ox.covers((85.0, 27.0, 86.0, 28.0))  # outside the extract: Overpass would be used
+    ox._load.cache_clear()

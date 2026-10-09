@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 
 OVERPASS_ENDPOINTS = (
     "https://overpass-api.de/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 )
@@ -75,26 +76,31 @@ class Asset:
         return f"{self.osm_type}/{self.osm_id}"
 
 
-def overpass_query(bounds: tuple[float, float, float, float]) -> str:
-    """Overpass QL for every asset class we score, in a lon/lat box (minlon, minlat, maxlon, maxlat)."""
+def overpass_selectors(bounds: tuple[float, float, float, float]) -> list[str]:
+    """One Overpass statement per asset class, in a lon/lat box (minlon, minlat, maxlon, maxlat)."""
     minlon, minlat, maxlon, maxlat = bounds
     bb = f"{minlat:.5f},{minlon:.5f},{maxlat:.5f},{maxlon:.5f}"  # Overpass wants south,west,north,east
     places, roads = "|".join(PLACES), "|".join(ROADS)
     amenities = "|".join(AMENITIES)
-    return f"""[out:json][timeout:120];
-(
-  nwr["place"~"^({places})$"]({bb});
-  way["bridge"]["bridge"!="no"]["highway"]({bb});
-  nwr["man_made"="bridge"]({bb});
-  way["highway"~"^({roads})$"]({bb});
-  nwr["power"="plant"]["plant:source"="hydro"]({bb});
-  nwr["power"="plant"]["name"~"hydro|hep|h\\\\.e\\\\.p",i]({bb});
-  nwr["power"="generator"]["generator:source"="hydro"]({bb});
-  nwr["waterway"~"^(dam|weir)$"]({bb});
-  nwr["amenity"~"^({amenities})$"]({bb});
-);
-out geom;
-"""
+    return [
+        f'nwr["place"~"^({places})$"]({bb});',
+        f'way["bridge"]["bridge"!="no"]["highway"]({bb});nwr["man_made"="bridge"]({bb});',
+        f'way["highway"~"^({roads})$"]({bb});',
+        (
+            f'nwr["power"="plant"]({bb});nwr["power"="generator"]["generator:source"="hydro"]({bb});'
+            f'nwr["waterway"~"^(dam|weir)$"]({bb});'
+        ),
+        f'nwr["amenity"~"^({amenities})$"]({bb});',
+    ]
+
+
+def overpass_query(bounds: tuple[float, float, float, float]) -> str:
+    """The whole request as one text (used as the cache key); sent as one small query per selector."""
+    return "\n".join(overpass_selectors(bounds))
+
+
+def _wrap(selector: str) -> str:
+    return f"[out:json][timeout:90];({selector});out geom;"
 
 
 def query_key(query: str) -> str:
@@ -102,7 +108,7 @@ def query_key(query: str) -> str:
     return hashlib.sha1(query.encode()).hexdigest()[:16]
 
 
-def _post_overpass(query: str, attempts: int = 4) -> dict:
+def _post_overpass(query: str, attempts: int = 3) -> dict:
     body = urllib.parse.urlencode({"data": query}).encode()
     err: Exception | None = None
     for attempt in range(attempts):
@@ -119,17 +125,26 @@ def _post_overpass(query: str, attempts: int = 4) -> dict:
             except (urllib.error.URLError, TimeoutError, OSError, ValueError, RuntimeError) as e:
                 err = e
                 log.warning("Overpass %s failed (%s), attempt %d", url, e, attempt + 1)
-        time.sleep(min(10 * 2**attempt, 60))  # every mirror failed: they are probably busy, back off
+        time.sleep(min(5 * 2**attempt, 60))  # every mirror failed: they are probably busy, back off
     raise RuntimeError("all Overpass endpoints failed") from err
 
 
 def fetch_assets(bounds: tuple[float, float, float, float]) -> list[Asset]:
-    """Exposed assets from OpenStreetMap in a lon/lat box, cached on disk."""
+    """Exposed assets from OpenStreetMap in a lon/lat box: from the local regional extract if it covers
+    the box (see osm_extract), otherwise from Overpass, cached on disk."""
+    from . import osm_extract  # local extract first: no network, no server timeouts
+
+    if osm_extract.covers(bounds):
+        return parse_overpass(osm_extract.query(bounds))
     query = overpass_query(bounds)
     path = cache_dir() / "osm" / f"{query_key(query)}.json"
     if path.exists():
         return parse_overpass(json.loads(path.read_text()))
-    data = _post_overpass(query)
+    # Public Overpass servers time out on big requests when busy, so send one small query per asset class.
+    data = {"elements": []}
+    for selector in overpass_selectors(bounds):
+        data["elements"] += _post_overpass(_wrap(selector))["elements"]
+        time.sleep(1)  # be polite: servers rate-limit bursts (HTTP 429/504)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data))
     return parse_overpass(data)
