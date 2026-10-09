@@ -67,15 +67,19 @@ func TestPlaceThreats(t *testing.T) {
 		})
 	}
 
-	t.Run("outside everywhere", func(t *testing.T) {
+	t.Run("outside everywhere, but the flood passes nearby", func(t *testing.T) {
 		got := decode[threatsResponse](t, env.do(t, "GET", "/places/node/11028063847/threats", nil))
-		if !got.Safe || !got.Known || len(got.Threats) != 0 {
-			t.Errorf("got %+v", got)
+		if !got.Safe || !got.Known || len(got.Threats) != 0 || got.Lon == nil || got.Lat == nil {
+			t.Fatalf("got %+v", got)
+		}
+		// Yamling is 605 m and 741 m from the two lakes' flood paths: both are "nearby".
+		if len(got.Nearby) != 2 || *got.Nearby[0].LateralM != 605 || got.Nearby[0].Status != "outside" {
+			t.Errorf("nearby = %+v", got.Nearby)
 		}
 	})
 	t.Run("unknown place", func(t *testing.T) {
 		got := decode[threatsResponse](t, env.do(t, "GET", "/places/node/1/threats", nil))
-		if !got.Safe || got.Known || got.Threats == nil {
+		if !got.Safe || got.Known || got.Threats == nil || got.Nearby == nil || got.Lon != nil {
 			t.Errorf("got %+v", got)
 		}
 	})

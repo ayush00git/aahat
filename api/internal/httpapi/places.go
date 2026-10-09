@@ -78,7 +78,12 @@ type threat struct {
 	ScenarioStatus     scenarioPair[string]   `json:"scenario_status"`
 	FloodDepthM        scenarioPair[*float64] `json:"flood_depth_m"`
 	HeightAboveFloodM  scenarioPair[*float64] `json:"height_above_flood_m"`
+	LateralM           *float64               `json:"lateral_m"` // the place's distance from the river line
 }
+
+// nearbyLateralM: a flood path this close to a place counts as "nearby" even when the place's
+// mapped point sits above the estimated flood level (riverside houses, fields and roads may not).
+const nearbyLateralM = 2000
 
 type threatsResponse struct {
 	OSM    string  `json:"osm"`
@@ -88,6 +93,11 @@ type threatsResponse struct {
 	Known   bool     `json:"known"`
 	Safe    bool     `json:"safe"`
 	Threats []threat `json:"threats"`
+	// Nearby: lakes whose flood passes within nearbyLateralM of the place without reaching its
+	// mapped point. They do not make the place unsafe, but the app should mention them.
+	Nearby []threat `json:"nearby"`
+	Lon    *float64 `json:"lon"`
+	Lat    *float64 `json:"lat"`
 }
 
 // placeThreats answers "is my village in a flood path, from which lake, and
@@ -106,23 +116,28 @@ func (s *server) placeThreats(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "lake index not published yet")
 		return
 	}
-	resp := threatsResponse{OSM: osm, Threats: []threat{}}
+	resp := threatsResponse{OSM: osm, Threats: []threat{}, Nearby: []threat{}}
 	for _, li := range all {
 		for _, im := range li.Impacts {
 			if im.OSM != osm {
 				continue
 			}
 			if !resp.Known {
-				resp.Known, resp.Name, resp.NameHi = true, im.Name, im.NameHi
+				lon, lat := im.Lon, im.Lat
+				resp.Known, resp.Name, resp.NameHi, resp.Lon, resp.Lat = true, im.Name, im.NameHi, &lon, &lat
 			}
 			if im.Status == data.StatusOutside {
-				continue
+				if im.LateralM != nil && *im.LateralM <= nearbyLateralM {
+					resp.Nearby = append(resp.Nearby, newThreat(li.Lake, im))
+				}
+			} else {
+				resp.Threats = append(resp.Threats, newThreat(li.Lake, im))
 			}
-			resp.Threats = append(resp.Threats, newThreat(li.Lake, im))
 			break // one row per lake (the nearest, as the file is nearest-first)
 		}
 	}
 	sortThreats(resp.Threats)
+	sortThreats(resp.Nearby)
 	resp.Safe = len(resp.Threats) == 0
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -130,7 +145,7 @@ func (s *server) placeThreats(w http.ResponseWriter, r *http.Request) {
 func newThreat(l data.Lake, im data.Impact) threat {
 	t := threat{
 		LakeID: l.ID, LakeName: l.Name, LakeNameHi: l.NameHi,
-		Status: im.Status, Km: im.Km,
+		Status: im.Status, Km: im.Km, LateralM: im.LateralM,
 		ArrivalMinFast: im.ArrivalMinFast, ArrivalMinExpected: im.ArrivalMinExpected,
 	}
 	if l.Risk != nil {
