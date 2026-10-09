@@ -2,8 +2,10 @@
 
 Per scene, a pixel is *observed* only if it is clear (SCL not cloud, cloud shadow, cirrus,
 snow/ice, saturated or nodata) and not in DEM-computed terrain shadow. An observed pixel is
-*water* if both NDWI (green/NIR) and MNDWI (green/SWIR) are above threshold. MNDWI separates
-turbid glacial water from bare rock; NDWI rejects snow and ice, whose MNDWI is also high.
+*water* if NDWI (green/NIR, both native 10 m) is above threshold. Snow, ice, rock and
+vegetation all sit well below it. MNDWI (green/SWIR) is available as an extra guard but off by
+default: on clear, dark lakes (Chandra Tal) green is so low that MNDWI drops below 0.3 even
+mid-lake, and the 20 m SWIR band smears bright shore into 10 m edge pixels.
 
 Per season, the composite marks water where a pixel was water in at least `min_freq` of its
 clear observations (and was observed at least `min_obs` times). Steep pixels are never water.
@@ -36,10 +38,12 @@ SCL_UNUSABLE = (0, 1, 3, 8, 9, 10, 11)  # nodata, saturated, cloud shadow, cloud
 
 @dataclass(frozen=True)
 class WaterParams:
-    # Calibrated on Gepang Gath, 2025: lake NDWI ~0.8-1.0 and MNDWI 5th pct 0.43; bare land
-    # NDWI 99th pct 0.05; glacier ice has high MNDWI but NDWI mostly < 0.1.
+    # Calibrated on five lakes (turbid proglacial Gepang Gath/Samudra Tapu, clear Chandra Tal,
+    # Kya Tso, Lam Dal): lake NDWI 0.6-1.0; bare land NDWI 99th pct 0.05; glacier ice mostly < 0.1.
+    # NDWI > 0.3 alone matched the dark-water footprint of Chandra Tal (0.447 vs 0.465 km2) where
+    # adding MNDWI > 0.3 kept only 0.012 km2, and changed Gepang Gath by under 5%.
     ndwi_min: float = 0.30
-    mndwi_min: float = 0.30
+    mndwi_min: float | None = None
     max_slope_deg: float = 25.0
     min_obs: int = 2
     min_freq: float = 0.5
@@ -63,6 +67,7 @@ class Composite:
     water_freq: np.ndarray
     scenes: list[SceneObs] = field(default_factory=list)
     inputs: list[Scene] = field(default_factory=list)
+    min_obs: int = WaterParams.min_obs  # observations required per pixel (fewer if the season had fewer scenes)
 
 
 def _reflectance(scene: Scene, key: str, grid: Grid, resampling=Resampling.bilinear) -> np.ndarray:
@@ -77,14 +82,19 @@ def read_clear(scene: Scene, grid: Grid) -> np.ndarray:
 
 
 def observe(scene: Scene, clear: np.ndarray, grid: Grid, terrain: Terrain, p: WaterParams) -> SceneObs:
-    with ThreadPoolExecutor(3) as pool:  # separate HTTP connections; throughput is often per-connection
-        green, nir, swir = pool.map(lambda k: _reflectance(scene, k, grid), ("green", "nir", "swir16"))
+    keys = ("green", "nir", "swir16") if p.mndwi_min is not None else ("green", "nir")
+    with ThreadPoolExecutor(len(keys)) as pool:  # separate HTTP connections; throughput is often per-connection
+        bands = dict(zip(keys, pool.map(lambda k: _reflectance(scene, k, grid), keys)))
+    green, nir = bands["green"], bands["nir"]
     with np.errstate(divide="ignore", invalid="ignore"):
         ndwi = (green - nir) / (green + nir)
-        mndwi = (green - swir) / (green + swir)
     shadow = terrain.shadow(scene.sun_azimuth, scene.sun_elevation)
-    observed = clear & ~shadow & np.isfinite(ndwi) & np.isfinite(mndwi)
-    water = observed & (ndwi > p.ndwi_min) & (mndwi > p.mndwi_min)
+    observed = clear & ~shadow & np.isfinite(ndwi)
+    water = observed & (ndwi > p.ndwi_min)
+    if p.mndwi_min is not None:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            mndwi = (green - bands["swir16"]) / (green + bands["swir16"])
+        water &= mndwi > p.mndwi_min
     return SceneObs(scene.day, scene.item_id, observed, water, float(observed.mean()))
 
 
@@ -113,8 +123,10 @@ def composite(
         water_count += o.water
     with np.errstate(divide="ignore", invalid="ignore"):
         freq = np.where(obs_count > 0, water_count / obs_count, np.nan).astype("float32")
-    water = (obs_count >= p.min_obs) & (freq >= p.min_freq) & (terrain.slope <= p.max_slope_deg)
-    return Composite(grid, water, obs_count, freq, obs, [s for s, _ in chosen])
+    # A season with a single clear scene still yields a (lower-confidence) outline from that scene.
+    min_obs = max(1, min(p.min_obs, len(chosen)))
+    water = (obs_count >= min_obs) & (freq >= p.min_freq) & (terrain.slope <= p.max_slope_deg)
+    return Composite(grid, water, obs_count, freq, obs, [s for s, _ in chosen], min_obs)
 
 
 @dataclass
@@ -124,7 +136,7 @@ class LakeExtent:
     perimeter_m: float
     uncertainty_m2: float  # +/- half a pixel along the shoreline
     polygon: object  # shapely geometry in grid CRS
-    coverage: float  # fraction of the lake (plus a 2 px rim) observed >= min_obs times
+    coverage: float  # fraction of the lake (plus a 2 px rim) observed at least comp.min_obs times
 
 
 def extract_lake(comp: Composite, seed_xy: tuple[float, float], p: WaterParams, search_m: float = 300.0) -> LakeExtent | None:
@@ -153,5 +165,5 @@ def extract_lake(comp: Composite, seed_xy: tuple[float, float], p: WaterParams, 
     area = float(lake.sum()) * grid.pixel_area_m2()
     perim = float(poly.length)
     rim = ndimage.binary_dilation(lake, iterations=2)
-    coverage = float((comp.obs_count[rim] >= p.min_obs).mean())
+    coverage = float((comp.obs_count[rim] >= comp.min_obs).mean())
     return LakeExtent(lake, area, perim, perim * grid.res / 2, poly, coverage)

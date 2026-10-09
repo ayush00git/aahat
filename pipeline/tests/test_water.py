@@ -1,3 +1,6 @@
+from datetime import date
+from types import SimpleNamespace
+
 import numpy as np
 from affine import Affine
 from pyproj import CRS
@@ -35,3 +38,20 @@ def test_extract_lake_none_when_seed_is_dry():
     water[80:90, 80:90] = True
     comp = Composite(GRID, water, np.full(GRID.shape, 5, "int16"), water.astype("float32"))
     assert extract_lake(comp, GRID.transform @ (10, 10), WaterParams()) is None
+
+
+def test_composite_with_a_single_scene_lowers_min_obs(monkeypatch):
+    import aahat.water as w
+
+    water = np.zeros(GRID.shape, bool)
+    water[20:40, 20:40] = True
+    obs = w.SceneObs(date(2025, 9, 1), "x", np.ones(GRID.shape, bool), water, 1.0)
+    monkeypatch.setattr(w, "read_clear", lambda s, g: np.ones(GRID.shape, bool))
+    monkeypatch.setattr(w, "observe", lambda s, c, g, t, p: obs)
+    terrain = SimpleNamespace(slope=np.zeros(GRID.shape, "float32"))
+    scene = SimpleNamespace(day=date(2025, 9, 1))
+
+    comp = w.composite([scene], GRID, terrain, WaterParams())
+    assert comp.min_obs == 1
+    ext = extract_lake(comp, GRID.transform @ (30, 30), WaterParams())
+    assert ext is not None and ext.coverage == 1.0

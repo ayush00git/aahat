@@ -64,19 +64,19 @@
     ]
   },
   {
-    "id": "kali-kund",
-    "name": "Kalikund",
-    "name_hi": "काली कुंड",
-    "lat": 32.3235,
-    "lon": 76.371,
-    "aoi_radius_m": 1000,
+    "id": "lam-dal",
+    "name": "Lam Dal",
+    "name_hi": "लम डल",
+    "lat": 32.3357,
+    "lon": 76.3321,
+    "aoi_radius_m": 1500,
     "district": "Kangra / Chamba",
     "basin": "Ravi",
     "kind": "glacial",
-    "notes": "Seed from OSM way 286534602. IIT Mandi flagged steep surrounding slopes.",
+    "notes": "Largest glacial lake on the Dhauladhar (OSM way 62047916), 0.18 km2 in 2025, seed placed from imagery. IIT Mandi names a 'Kalikund' (Kangra/Chamba) among nine fast-growing lakes, but the two OSM Kali Kund ponds nearby are far too small for the reported ~120,000 m2 growth, so we monitor Lam Dal and do not attribute that figure to it.",
     "sources": [
-      "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal",
-      "https://www.openstreetmap.org/way/286534602"
+      "https://www.openstreetmap.org/way/62047916",
+      "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal"
     ]
   }
 ]

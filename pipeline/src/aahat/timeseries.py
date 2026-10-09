@@ -32,7 +32,7 @@ def season(year: int) -> tuple[date, date]:
 class LakeYear:
     lake_id: str
     year: int
-    status: str  # ok | partial | not_found | no_data
+    status: str  # ok | partial (lake not fully seen, or < min_obs clear scenes) | not_found | no_data
     area_m2: float | None
     uncertainty_m2: float | None
     perimeter_m: float | None
@@ -63,7 +63,8 @@ def lake_year(
     days = (used[0].day.isoformat(), used[-1].day.isoformat())
     if ext is None:
         return LakeYear(lake.id, year, "not_found", None, None, None, None, len(found), len(used), *days, asdict(p)), comp, None
-    status = "ok" if ext.coverage >= 0.9 else "partial"
+    # partial: the lake was not fully observed, or the season had fewer clear scenes than p.min_obs
+    status = "ok" if ext.coverage >= 0.9 and len(used) >= p.min_obs else "partial"
     rec = LakeYear(
         lake.id,
         year,
