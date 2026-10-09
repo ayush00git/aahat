@@ -43,14 +43,13 @@ before freeze-up), the pipeline:
 4. calls a clear pixel water when NDWI (green/NIR, both 10 m bands) > 0.3. Snow, ice, rock and vegetation
    sit well below that. We tried also requiring MNDWI (green/SWIR) > 0.3, but on clear dark lakes like Chandra
    Tal green is so low that MNDWI fails mid-lake, and the 20 m SWIR band blurs shorelines, so it is off;
-5. marks water where a pixel was water in at least half of its clear observations (at least 2; a season
-   with a single clear scene uses that one and is flagged `partial`), on slopes
-   under 25 degrees;
+5. marks water where a pixel was water in at least half of its clear observations, on slopes under 25 degrees;
 6. takes the connected water body at the lake's seed point, closes 2-pixel gaps (brash ice at calving fronts)
    and fills holes (icebergs).
 
 Each yearly area carries a ±half-pixel shoreline uncertainty (perimeter × 5 m) and a coverage figure: the
-share of the lake and its rim that was clearly observed at least twice. Below 90% the year is marked `partial`.
+share of the lake and its rim that was clearly observed at least twice. Below 90%, or with fewer than two clear
+scenes in the season, the year is marked `partial`.
 
 ## Data
 

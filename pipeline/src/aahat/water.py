@@ -8,7 +8,8 @@ default: on clear, dark lakes (Chandra Tal) green is so low that MNDWI drops bel
 mid-lake, and the 20 m SWIR band smears bright shore into 10 m edge pixels.
 
 Per season, the composite marks water where a pixel was water in at least `min_freq` of its
-clear observations (and was observed at least `min_obs` times). Steep pixels are never water.
+clear observations. Steep pixels are never water. The share of a lake observed at least
+`min_obs` times is reported as its coverage, and low coverage flags the year as partial.
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ class WaterParams:
     min_obs: int = 2
     min_freq: float = 0.5
     close_px: int = 2  # bridge brash ice and iceberg strings up to ~2*close_px pixels wide
+    bridge_px: int = 10  # connect lake parts across never-seen pixels (cloud on the lake) up to this far from water
 
 
 @dataclass
@@ -105,15 +107,18 @@ def composite(
     p: WaterParams = WaterParams(),
     max_scenes: int = 12,
     min_clear: float = 0.2,
+    focus: np.ndarray | None = None,
     workers: int = 6,
 ) -> Composite:
-    """Rank candidate scenes by how clear the AOI actually is (SCL), then map water on the best few."""
+    """Rank candidate scenes by how clear the `focus` area (default: whole grid) actually is (SCL),
+    then map water on the best few. A scene with clouds on the hills but a clear lake is useful."""
     with ThreadPoolExecutor(workers) as pool:
         clears = list(pool.map(lambda s: read_clear(s, grid), scenes))
-    ranked = sorted(zip(scenes, clears), key=lambda sc: -sc[1].mean())
-    chosen = [(s, c) for s, c in ranked if c.mean() >= min_clear][:max_scenes]
+    frac = [float(c[focus].mean() if focus is not None else c.mean()) for c in clears]
+    ranked = sorted(zip(scenes, clears, frac), key=lambda scf: -scf[2])
+    chosen = [(s, c) for s, c, f in ranked if f >= min_clear][:max_scenes]
     chosen.sort(key=lambda sc: sc[0].day)
-    log.info("%d/%d scenes clear enough; using %d", sum(c.mean() >= min_clear for c in clears), len(scenes), len(chosen))
+    log.info("%d/%d scenes clear enough; using %d", sum(f >= min_clear for f in frac), len(scenes), len(chosen))
     with ThreadPoolExecutor(workers) as pool:
         obs = list(pool.map(lambda sc: observe(sc[0], sc[1], grid, terrain, p), chosen))
     obs_count = np.zeros(grid.shape, dtype="int16")
@@ -123,9 +128,11 @@ def composite(
         water_count += o.water
     with np.errstate(divide="ignore", invalid="ignore"):
         freq = np.where(obs_count > 0, water_count / obs_count, np.nan).astype("float32")
-    # A season with a single clear scene still yields a (lower-confidence) outline from that scene.
+    # Map from every clearly seen pixel (majority vote over its looks), so a lake half-hidden in all
+    # but one scene is not truncated. `min_obs` (lowered when the season had fewer scenes) is the
+    # confidence bar: the share of the lake seen that often becomes its `coverage`.
     min_obs = max(1, min(p.min_obs, len(chosen)))
-    water = (obs_count >= min_obs) & (freq >= p.min_freq) & (terrain.slope <= p.max_slope_deg)
+    water = (obs_count >= 1) & (freq >= p.min_freq) & (terrain.slope <= p.max_slope_deg)
     return Composite(grid, water, obs_count, freq, obs, [s for s, _ in chosen], min_obs)
 
 
@@ -140,20 +147,28 @@ class LakeExtent:
 
 
 def extract_lake(comp: Composite, seed_xy: tuple[float, float], p: WaterParams, search_m: float = 300.0) -> LakeExtent | None:
-    """The water body at the seed point: the largest connected water component within `search_m`."""
+    """The water body at the seed point: the largest connected water component within `search_m`.
+
+    Parts of a lake split by a cloud stay one lake: connectivity may pass through pixels that were
+    never clearly seen (within `bridge_px` of water), but never through pixels seen to be dry.
+    """
     grid = comp.grid
-    labels, n = ndimage.label(comp.water, structure=np.ones((3, 3)))
+    unseen = comp.obs_count == 0
+    bridge = np.zeros_like(unseen)
+    if p.bridge_px:
+        bridge = unseen & ndimage.binary_dilation(comp.water, iterations=p.bridge_px)
+    labels, n = ndimage.label(comp.water | bridge, structure=np.ones((3, 3)))
     if n == 0:
         return None
     r0, c0 = grid.xy_to_rowcol(*seed_xy)
     rad = int(search_m / grid.res)
     rr, cc = np.ogrid[: grid.height, : grid.width]
     disk = (rr - r0) ** 2 + (cc - c0) ** 2 <= rad**2
-    near = np.unique(labels[disk & (labels > 0)])
+    near = np.unique(labels[disk & comp.water & (labels > 0)])
     if near.size == 0:
         return None
-    sizes = ndimage.sum_labels(np.ones_like(labels), labels, near)
-    lake = labels == near[int(np.argmax(sizes))]
+    water_px = ndimage.sum_labels(comp.water, labels, near)
+    lake = (labels == near[int(np.argmax(water_px))]) & comp.water
     # Icebergs and brash ice at a calving front belong to the lake: close narrow gaps, fill holes.
     if p.close_px:
         pad = p.close_px + 1

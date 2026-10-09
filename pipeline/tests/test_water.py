@@ -55,3 +55,18 @@ def test_composite_with_a_single_scene_lowers_min_obs(monkeypatch):
     assert comp.min_obs == 1
     ext = extract_lake(comp, GRID.transform @ (30, 30), WaterParams())
     assert ext is not None and ext.coverage == 1.0
+
+
+def test_extract_lake_bridges_a_cloud_gap_but_not_dry_land():
+    water = np.zeros(GRID.shape, bool)
+    water[20:40, 10:30] = True
+    water[20:40, 35:55] = True  # same lake beyond a 5 px cloud strip
+    water[20:40, 60:80] = True  # separate lake beyond 5 px of land seen to be dry
+    obs = np.full(GRID.shape, 3, "int16")
+    obs[:, 30:35] = 0  # never seen: cloud over the lake in every scene
+    comp = Composite(GRID, water, obs, water.astype("float32"))
+    ext = extract_lake(comp, GRID.transform @ (20, 30), WaterParams())
+    assert ext is not None
+    # both halves plus the enclosed-by-closing part of the strip, but not the third lake
+    assert 800 * 100 <= ext.area_m2 < 1200 * 100
+    assert not ext.mask[:, 60:80].any()

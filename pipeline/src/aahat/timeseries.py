@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import numpy as np
 from shapely.geometry import mapping
 
 from .dem import Terrain
@@ -44,6 +45,14 @@ class LakeYear:
     params: dict
 
 
+def lake_focus(grid, seed_xy: tuple[float, float], radius_m: float) -> np.ndarray:
+    """Disk around the lake's seed point: scene selection cares about clouds here, not on the hills."""
+    r0, c0 = grid.xy_to_rowcol(*seed_xy)
+    rad = max(radius_m, 500.0) / grid.res
+    rr, cc = np.ogrid[: grid.height, : grid.width]
+    return (rr - r0) ** 2 + (cc - c0) ** 2 <= rad**2
+
+
 def lake_year(
     lake: Lake, year: int, terrain: Terrain, p: WaterParams = WaterParams(), max_scenes: int = 12
 ) -> tuple[LakeYear, Composite | None, LakeExtent | None]:
@@ -54,7 +63,8 @@ def lake_year(
     log.info("%s %d: %d candidate scenes", lake.id, year, len(found))
     if not found:
         return LakeYear(lake.id, year, "no_data", None, None, None, None, 0, 0, None, None, asdict(p)), None, None
-    comp = composite(found, grid, terrain, p, max_scenes=max_scenes)
+    seed = point_in_crs(lake.lon, lake.lat, grid.crs)
+    comp = composite(found, grid, terrain, p, max_scenes=max_scenes, focus=lake_focus(grid, seed, lake.aoi_radius_m / 2))
     used = comp.inputs
     if not used:
         return (
