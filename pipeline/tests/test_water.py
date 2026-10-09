@@ -46,7 +46,7 @@ def test_composite_with_a_single_scene_lowers_min_obs(monkeypatch):
     water = np.zeros(GRID.shape, bool)
     water[20:40, 20:40] = True
     obs = w.SceneObs(date(2025, 9, 1), "x", np.ones(GRID.shape, bool), water, 1.0)
-    monkeypatch.setattr(w, "read_clear", lambda s, g: np.ones(GRID.shape, bool))
+    monkeypatch.setattr(w, "read_scl", lambda s, g: np.full(GRID.shape, 4, "uint8"))
     monkeypatch.setattr(w, "observe", lambda s, c, g, t, p: obs)
     terrain = SimpleNamespace(slope=np.zeros(GRID.shape, "float32"))
     scene = SimpleNamespace(day=date(2025, 9, 1))
@@ -70,3 +70,18 @@ def test_extract_lake_bridges_a_cloud_gap_but_not_dry_land():
     # both halves plus the enclosed-by-closing part of the strip, but not the third lake
     assert 800 * 100 <= ext.area_m2 < 1200 * 100
     assert not ext.mask[:, 60:80].any()
+
+
+def test_scl_cloud_shadow_vouches_for_dark_water_but_never_votes_dry(monkeypatch):
+    import aahat.water as w
+
+    green = np.full(GRID.shape, 0.03, "float32")
+    nir = np.full(GRID.shape, 0.002, "float32")  # dark lake: NDWI ~0.88
+    nir[:, 50:] = 0.05  # land in cloud shadow: NDWI < 0
+    monkeypatch.setattr(w, "_reflectance", lambda s, k, g: {"green": green, "nir": nir}[k])
+    terrain = SimpleNamespace(shadow=lambda az, el: np.zeros(GRID.shape, bool))
+    scene = SimpleNamespace(day=date(2025, 9, 23), item_id="x", sun_azimuth=150, sun_elevation=50)
+    scl = np.full(GRID.shape, 3, "uint8")  # Sen2Cor calls everything cloud shadow
+    obs = w.observe(scene, scl, GRID, terrain, WaterParams())
+    assert obs.water[:, :50].all() and obs.observed[:, :50].all()
+    assert not obs.observed[:, 50:].any()  # shadowed land is unknown, not dry

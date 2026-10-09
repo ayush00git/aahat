@@ -38,8 +38,10 @@ before freeze-up), the pipeline:
    the newest processing baseline;
 2. reads only the 20 m scene-classification band for each, and keeps the scenes that are clearest over the
    lake (up to `--max-scenes`);
-3. per scene, drops pixels that are cloud, cloud shadow, cirrus, snow/ice, saturated or nodata (SCL), or in
-   terrain shadow (ray-marched over the Copernicus DEM toward that scene's sun position);
+3. per scene, drops pixels that are cloud, cirrus, snow/ice, saturated or nodata (SCL), or in terrain shadow
+   (ray-marched over the Copernicus DEM toward that scene's sun position). SCL "cloud shadow" and "unclassified"
+   pixels are treated as uncertain: Sen2Cor often labels whole dark lakes as cloud shadow and leaves thin haze
+   unclassified, so they can only add evidence for water (NDWI > 0.5), never a dry look;
 4. calls a clear pixel water when NDWI (green/NIR, both 10 m bands) > 0.3. Snow, ice, rock and vegetation
    sit well below that. We tried also requiring MNDWI (green/SWIR) > 0.3, but on clear dark lakes like Chandra
    Tal green is so low that MNDWI fails mid-lake, and the 20 m SWIR band blurs shorelines, so it is off;

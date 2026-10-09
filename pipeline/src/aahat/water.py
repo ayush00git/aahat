@@ -1,8 +1,11 @@
 """Water mapping from Sentinel-2 L2A with cloud, snow and terrain-shadow handling.
 
-Per scene, a pixel is *observed* only if it is clear (SCL not cloud, cloud shadow, cirrus,
-snow/ice, saturated or nodata) and not in DEM-computed terrain shadow. An observed pixel is
-*water* if NDWI (green/NIR, both native 10 m) is above threshold. Snow, ice, rock and
+Per scene, a pixel is *observed* only if it is clear (SCL not cloud, cirrus, snow/ice,
+saturated or nodata) and not in DEM-computed terrain shadow. SCL "cloud shadow" and
+"unclassified" are uncertain: Sen2Cor often labels whole dark lakes as cloud shadow (Lam Dal,
+Sept 2025, NDWI 0.9) and leaves thin haze unclassified, so those pixels only ever count as
+evidence *for* water, when NDWI is strongly water-like, never as a dry look. An observed pixel
+is *water* if NDWI (green/NIR, both native 10 m) is above threshold. Snow, ice, rock and
 vegetation all sit well below it. MNDWI (green/SWIR) is available as an extra guard but off by
 default: on clear, dark lakes (Chandra Tal) green is so low that MNDWI drops below 0.3 even
 mid-lake, and the 20 m SWIR band smears bright shore into 10 m edge pixels.
@@ -33,8 +36,9 @@ from .stac import Scene
 
 log = logging.getLogger(__name__)
 
-# Sentinel-2 Scene Classification Layer codes that make a pixel unusable.
-SCL_UNUSABLE = (0, 1, 3, 8, 9, 10, 11)  # nodata, saturated, cloud shadow, cloud med/high, cirrus, snow
+# Sentinel-2 Scene Classification Layer codes.
+SCL_UNUSABLE = (0, 1, 8, 9, 10, 11)  # nodata, saturated, cloud medium/high, thin cirrus, snow/ice
+SCL_UNCERTAIN = (3, 7)  # cloud shadow (often really a dark lake), unclassified (often haze)
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,7 @@ class WaterParams:
     min_freq: float = 0.5
     close_px: int = 2  # bridge brash ice and iceberg strings up to ~2*close_px pixels wide
     bridge_px: int = 10  # connect lake parts across never-seen pixels (cloud on the lake) up to this far from water
+    ndwi_strong: float = 0.5  # an SCL-uncertain pixel counts (as water) only above this NDWI
 
 
 @dataclass
@@ -77,26 +82,28 @@ def _reflectance(scene: Scene, key: str, grid: Grid, resampling=Resampling.bilin
     return dn * scene.scale[key] + scene.offset[key]
 
 
-def read_clear(scene: Scene, grid: Grid) -> np.ndarray:
-    """Clear-sky, snow-free mask from the cheap 20 m SCL band."""
-    scl = read_to_grid(scene.hrefs["scl"], grid, Resampling.nearest, dtype="uint8", nodata=0)
-    return ~np.isin(scl, SCL_UNUSABLE)
+def read_scl(scene: Scene, grid: Grid) -> np.ndarray:
+    """The cheap 20 m scene classification band."""
+    return read_to_grid(scene.hrefs["scl"], grid, Resampling.nearest, dtype="uint8", nodata=0)
 
 
-def observe(scene: Scene, clear: np.ndarray, grid: Grid, terrain: Terrain, p: WaterParams) -> SceneObs:
+def observe(scene: Scene, scl: np.ndarray, grid: Grid, terrain: Terrain, p: WaterParams) -> SceneObs:
     keys = ("green", "nir", "swir16") if p.mndwi_min is not None else ("green", "nir")
     with ThreadPoolExecutor(len(keys)) as pool:  # separate HTTP connections; throughput is often per-connection
         bands = dict(zip(keys, pool.map(lambda k: _reflectance(scene, k, grid), keys)))
     green, nir = bands["green"], bands["nir"]
     with np.errstate(divide="ignore", invalid="ignore"):
         ndwi = (green - nir) / (green + nir)
-    shadow = terrain.shadow(scene.sun_azimuth, scene.sun_elevation)
-    observed = clear & ~shadow & np.isfinite(ndwi)
-    water = observed & (ndwi > p.ndwi_min)
+    is_water = ndwi > p.ndwi_min
     if p.mndwi_min is not None:
         with np.errstate(divide="ignore", invalid="ignore"):
             mndwi = (green - bands["swir16"]) / (green + bands["swir16"])
-        water &= mndwi > p.mndwi_min
+        is_water &= mndwi > p.mndwi_min
+    clear = ~np.isin(scl, SCL_UNUSABLE + SCL_UNCERTAIN)
+    vouched = np.isin(scl, SCL_UNCERTAIN) & is_water & (ndwi > p.ndwi_strong)
+    shadow = terrain.shadow(scene.sun_azimuth, scene.sun_elevation)
+    observed = (clear | vouched) & ~shadow & np.isfinite(ndwi)
+    water = observed & is_water
     return SceneObs(scene.day, scene.item_id, observed, water, float(observed.mean()))
 
 
@@ -113,9 +120,10 @@ def composite(
     """Rank candidate scenes by how clear the `focus` area (default: whole grid) actually is (SCL),
     then map water on the best few. A scene with clouds on the hills but a clear lake is useful."""
     with ThreadPoolExecutor(workers) as pool:
-        clears = list(pool.map(lambda s: read_clear(s, grid), scenes))
-    frac = [float(c[focus].mean() if focus is not None else c.mean()) for c in clears]
-    ranked = sorted(zip(scenes, clears, frac), key=lambda scf: -scf[2])
+        scls = list(pool.map(lambda s: read_scl(s, grid), scenes))
+    usable = [~np.isin(scl, SCL_UNUSABLE) for scl in scls]
+    frac = [float(u[focus].mean() if focus is not None else u.mean()) for u in usable]
+    ranked = sorted(zip(scenes, scls, frac), key=lambda scf: -scf[2])
     chosen = [(s, c) for s, c, f in ranked if f >= min_clear][:max_scenes]
     chosen.sort(key=lambda sc: sc[0].day)
     log.info("%d/%d scenes clear enough; using %d", sum(f >= min_clear for f in frac), len(scenes), len(chosen))
