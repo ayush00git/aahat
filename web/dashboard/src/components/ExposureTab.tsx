@@ -1,7 +1,7 @@
 import { useMemo, useState } from "preact/hooks";
 import { arrival, discharge, DASH, KIND_LABEL, num, STATUS_LABEL, subkind, volume } from "../format";
 import type { DownstreamFile, Impact, ImpactKind, Lake, ScenarioName } from "../types";
-import { Section, SourceText, StatusBadge } from "./ui";
+import { MoreToggle, Section, SourceText, StatusBadge } from "./ui";
 
 const KINDS: ImpactKind[] = ["settlement", "school", "health", "bridge", "road", "hydro"];
 
@@ -12,7 +12,8 @@ function pair(a: number | null | undefined, b: number | null | undefined, signed
     return signed ? (v > 0 ? "+" : v < 0 ? "−" : "") + s : num(v, 1);
   };
   if ((a === null || a === undefined) && (b === null || b === undefined)) return DASH;
-  return `${f(a)} / ${f(b)}`;
+  // The zero-width space after the slash lets the pair wrap onto two lines in a narrow panel.
+  return `${f(a)} /\u200b${f(b)}`;
 }
 
 export function ExposureTab({
@@ -27,6 +28,7 @@ export function ExposureTab({
   onFocus: (im: Impact) => void;
 }) {
   const [kinds, setKinds] = useState<Set<ImpactKind>>(new Set());
+  const [more, setMore] = useState(false);
   const rows = useMemo(
     () =>
       impacts
@@ -57,7 +59,7 @@ export function ExposureTab({
 
   return (
     <div class="tab-body">
-      <Section title="Flood scenarios" aside={<span class="muted small">path {num(downstream?.path_km ?? ds?.path_km, 1)} km modelled</span>}>
+      <Section title="Flood scenarios" aside={<span class="muted">{num(downstream?.path_km ?? ds?.path_km, 1)} km modelled</span>}>
         {scen ? (
           <div class="scenario-cards">
             {(["expected", "severe"] as ScenarioName[]).map((s) => {
@@ -67,11 +69,14 @@ export function ExposureTab({
                 <div key={s} class={`scenario-card ${s}`}>
                   <div class="scenario-name">{s === "expected" ? "Expected" : "Severe"}</div>
                   <div class="scenario-peak">{discharge(d.peak_m3s)}</div>
-                  <div class="mono small">{d.relation}</div>
-                  {d.note && <div class="small muted">{d.note}</div>}
-                  <div class="small source">
-                    <SourceText text={d.source} />
-                  </div>
+                  <details class="more">
+                    <summary>Relation · source</summary>
+                    <p class="formula">{d.relation}</p>
+                    {d.note && <p>{d.note}</p>}
+                    <p>
+                      <SourceText text={d.source} />
+                    </p>
+                  </details>
                 </div>
               );
             })}
@@ -80,8 +85,8 @@ export function ExposureTab({
           <p class="muted">Discharge scenarios not available.</p>
         )}
         {downstream?.volume_m3 != null && (
-          <p class="small muted">
-            From lake volume {volume(downstream.volume_m3)} (season {downstream.as_of_season}).
+          <p class="caption">
+            Peak flow at the lake, from volume {volume(downstream.volume_m3)} (season {downstream.as_of_season}).
           </p>
         )}
       </Section>
@@ -118,7 +123,7 @@ export function ExposureTab({
           <p class="muted">No exposed assets found along the modelled path.</p>
         )}
         {(ds?.first_settlement || ds?.first_exposed) && (
-          <ul class="firsts small">
+          <ul class="firsts">
             {ds?.first_exposed && (
               <li>
                 <span class="k">First asset</span> {ds.first_exposed.name ?? KIND_LABEL[ds.first_exposed.kind]} (
@@ -137,7 +142,7 @@ export function ExposureTab({
           </ul>
         )}
         {gaps.length > 0 && (
-          <p class="flag">
+          <p class="note">
             OpenStreetMap could not be read for{" "}
             {gaps.map((g, i) => (
               <span key={i}>
@@ -150,7 +155,17 @@ export function ExposureTab({
         )}
       </Section>
 
-      <Section title="Downstream exposure, nearest first" aside={<span class="muted small">{shown.length} of {rows.length}</span>}>
+      <Section
+        title="Nearest first"
+        aside={
+          <span class="aside-row">
+            <span class="muted">
+              {shown.length} of {rows.length}
+            </span>
+            <MoreToggle on={more} onToggle={() => setMore(!more)} />
+          </span>
+        }
+      >
         <div class="chips" role="group" aria-label="Filter by kind">
           <button type="button" class={`chip${kinds.size === 0 ? " on" : ""}`} onClick={() => setKinds(new Set())}>
             All
@@ -162,24 +177,38 @@ export function ExposureTab({
           ))}
         </div>
         <div class="table-scroll">
-          <table class="table exposure">
+          <table class={`table exposure${more ? " more" : ""}`}>
+            <colgroup>
+              <col class="c-km" />
+              <col class="c-name" />
+              <col class="c-status" />
+              <col class="c-arr" />
+              {more && <col class="c-depth" />}
+              {more && <col class="c-above" />}
+            </colgroup>
             <thead>
               <tr>
-                <th class="num">km</th>
-                <th>Name</th>
-                <th>Kind</th>
+                <th class="num" title="Distance along the flood path from the lake">
+                  km
+                </th>
+                <th>Name · kind</th>
                 <th>Status</th>
                 <th class="num" title="Fast to expected flood-front arrival, minutes after the burst">
-                  Arrival (min)
+                  Arrival<br />
+                  <span class="th-sub">min</span>
                 </th>
-                <th class="num" title="Flood depth at the river, expected / severe">
-                  Depth m<br />
-                  <span class="th-sub">exp / sev</span>
-                </th>
-                <th class="num" title="Height of the asset above the flood level (negative: under water), expected / severe">
-                  Above flood m<br />
-                  <span class="th-sub">exp / sev</span>
-                </th>
+                {more && (
+                  <th class="num" title="Flood depth at the river, expected / severe">
+                    Depth m<br />
+                    <span class="th-sub">exp / sev</span>
+                  </th>
+                )}
+                {more && (
+                  <th class="num" title="Height of the asset above the flood level (negative: under water), expected / severe">
+                    Above flood m<br />
+                    <span class="th-sub">exp / sev</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -196,27 +225,27 @@ export function ExposureTab({
                           {im.name_hi}
                         </span>
                       )}
+                      <span class="muted block small cell-kind">
+                        {KIND_LABEL[im.kind] ?? im.kind}
+                        {im.subkind && im.subkind !== im.kind ? ` · ${subkind(im.subkind)}` : ""}
+                      </span>
                     </td>
                     <td>
-                      {KIND_LABEL[im.kind] ?? im.kind}
-                      {im.subkind && <span class="muted block small">{subkind(im.subkind)}</span>}
-                    </td>
-                    <td>
-                      <StatusBadge status={im.status} />
+                      <StatusBadge status={im.status} short />
                     </td>
                     <td class="num nowrap">
                       {im.arrival_min_fast === null && im.arrival_min_expected === null
                         ? DASH
                         : arrival(im.arrival_min_fast, im.arrival_min_expected).replace(" min", "").replace("~", "")}
                     </td>
-                    <td class="num nowrap">{pair(e?.flood_depth_m, s?.flood_depth_m)}</td>
-                    <td class="num nowrap">{pair(e?.height_above_flood_m, s?.height_above_flood_m, true)}</td>
+                    {more && <td class="num pair">{pair(e?.flood_depth_m, s?.flood_depth_m)}</td>}
+                    {more && <td class="num pair">{pair(e?.height_above_flood_m, s?.height_above_flood_m, true)}</td>}
                   </tr>
                 );
               })}
               {shown.length === 0 && (
                 <tr>
-                  <td colSpan={7} class="muted">
+                  <td colSpan={more ? 6 : 4} class="muted">
                     Nothing {kinds.size ? "of this kind " : ""}in the flood path or at risk.
                   </td>
                 </tr>
@@ -226,18 +255,19 @@ export function ExposureTab({
         </div>
         <p class="caption">
           {STATUS_LABEL.in_flood_path}: flooded in the expected scenario. {STATUS_LABEL.at_risk}: flooded only in the
-          severe scenario, or only just above the flood level (safety margin). Click a row to show it on the map.
+          severe scenario, or just above it. Click a row to show it on the map.
         </p>
       </Section>
 
       {downstream?.caveats?.length ? (
-        <Section title="Caveats">
+        <details class="more more-section">
+          <summary>Caveats ({downstream.caveats.length})</summary>
           <ul class="caveats">
             {downstream.caveats.map((c, i) => (
               <li key={i}>{c}</li>
             ))}
           </ul>
-        </Section>
+        </details>
       ) : null}
     </div>
   );

@@ -3,7 +3,7 @@ import { api, ApiError } from "../api";
 import { requireSignIn, useAuth } from "../auth";
 import { arrival, dateTime, discharge, KIND_LABEL, metres, num, OUTCOME_LABEL, signedMetres } from "../format";
 import type { AlertEvent, DownstreamFile, Lake, ScenarioName } from "../types";
-import { ErrorMsg, Loading, Section, StatusBadge } from "./ui";
+import { ErrorMsg, Loading, MoreToggle, Section, StatusBadge } from "./ui";
 
 const SCENARIO_LABEL: Record<string, string> = { expected: "Expected", severe: "Severe" };
 
@@ -98,6 +98,7 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
   const subs = places.reduce((n, p) => n + p.subscribers, 0);
   const mode = eventMode(ev);
   const dryCount = recips.filter((r) => r.delivery.status === "dry_run").length;
+  const [more, setMore] = useState(false);
   return (
     <div class="plan">
       {requestedDry && mode === "live" && (
@@ -121,7 +122,7 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
         <span>
           <b>{SCENARIO_LABEL[ev.scenario] ?? ev.scenario}</b> scenario · {dateTime(ev.created_at)}
         </span>
-        <span class="muted mono small">{ev.event_id}</span>
+        <span class="muted small">{ev.event_id}</span>
       </div>
       {ev.note && <p class="small">Note: {ev.note}</p>}
       {ev.sensor && (
@@ -156,7 +157,10 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
         </div>
       </div>
 
-      <h4>Affected places, in arrival order</h4>
+      <div class="plan-sub">
+        <h4>Affected places, in arrival order</h4>
+        {places.length > 0 && <MoreToggle on={more} onToggle={() => setMore(!more)} />}
+      </div>
       {places.length === 0 ? (
         <p class="muted small">No settlements, schools or health facilities are hit in this scenario.</p>
       ) : (
@@ -169,8 +173,8 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
                 <th>Place</th>
                 <th class="num">Arrival</th>
                 <th>Outcome</th>
-                <th class="num">Depth</th>
-                <th class="num">Above flood</th>
+                {more && <th class="num">Depth</th>}
+                {more && <th class="num">Above flood</th>}
                 <th class="num">Subs</th>
               </tr>
             </thead>
@@ -187,15 +191,17 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
                         {p.name_hi}
                       </span>
                     )}
-                    <span class="muted block small">{KIND_LABEL[p.kind] ?? p.kind}</span>
+                    {more && <span class="muted block small">{KIND_LABEL[p.kind] ?? p.kind}</span>}
                   </td>
                   <td class="num nowrap">{arrival(p.arrival_min_fast, p.arrival_min_expected)}</td>
                   <td>
                     <StatusBadge status={p.status} />
-                    {p.scenario_status && <span class="muted block small">{OUTCOME_LABEL[p.scenario_status] ?? p.scenario_status}</span>}
+                    {more && p.scenario_status && (
+                      <span class="muted block small">{OUTCOME_LABEL[p.scenario_status] ?? p.scenario_status}</span>
+                    )}
                   </td>
-                  <td class="num nowrap">{metres(p.flood_depth_m)}</td>
-                  <td class="num nowrap">{signedMetres(p.height_above_flood_m)}</td>
+                  {more && <td class="num nowrap">{metres(p.flood_depth_m)}</td>}
+                  {more && <td class="num nowrap">{signedMetres(p.height_above_flood_m)}</td>}
                   <td class="num">{p.subscribers}</td>
                 </tr>
               ))}
@@ -225,7 +231,7 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
                 </span>
               </div>
               <div class="recipient-meta small">
-                <span class="mono">{r.phone || "—"}</span> · {r.channel} · {r.lang === "hi" ? "Hindi" : r.lang === "en" ? "English" : r.lang}
+                <span>{r.phone || "—"}</span> · {r.channel} · {r.lang === "hi" ? "Hindi" : r.lang === "en" ? "English" : r.lang}
                 {r.audio_url && <AudioButton url={r.audio_url} />}
               </div>
               {r.short_message && (
@@ -361,13 +367,10 @@ export function AlertsTab({ lake, downstream }: { lake: Lake; downstream: Downst
 
   return (
     <div class="tab-body">
-      <div class="sim-banner" role="note">
+      <p class="sim-banner" role="note">
         <span class="tag sim">SIMULATION</span>
-        <span>
-          Drill the warning chain for {lake.name}: who would be warned, and in which order. Logged as a simulation. A dry
-          run sends nothing.
-        </span>
-      </div>
+        Drill the warning chain for {lake.name}: who is warned, in which order.
+      </p>
 
       <Section title="Simulate a burst">
         <div class="sim-form">
@@ -387,7 +390,7 @@ export function AlertsTab({ lake, downstream }: { lake: Lake; downstream: Downst
             ))}
           </div>
           <label class="field">
-            <span>Note for the log (optional)</span>
+            <span>Note for the log</span>
             <input
               type="text"
               maxLength={200}

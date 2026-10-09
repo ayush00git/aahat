@@ -18,7 +18,7 @@ npm run dev            # http://localhost:5173
 
 In dev, Vite proxies `/api/*` to `http://127.0.0.1:8081` and strips the `/api` prefix. To point at another API, set `AAHAT_API_TARGET`, for example `AAHAT_API_TARGET=http://127.0.0.1:8080 npm run dev`.
 
-Deep links: `#/<lake-id>/<tab>`, where tab is `risk`, `growth`, `exposure` or `alerts`. For example, `/#/gepang-gath/exposure`.
+Deep links: `#/<lake-id>/<tab>`, where tab is `risk`, `growth`, `exposure`, `evidence` or `alerts`. For example, `/#/gepang-gath/exposure`.
 
 ## Build and deploy
 
@@ -36,16 +36,18 @@ Production is served under **`/officials/`**: Caddy strips the prefix and serves
 
 The MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`, so the server must send `.mjs` as `text/javascript` (Caddy does). Navigation uses only the URL hash, so no server-side SPA fallback is needed.
 
-Bundle (gzip): app JS about 26 kB, MapLibre about 288 kB (its own chunk, cached separately), CSS about 17 kB (including MapLibre's). Fonts (IBM Plex Sans, Plex Sans Devanagari, Plex Mono) load from Google Fonts with a system fallback. The map worker is 508 kB uncompressed.
+Bundle (gzip): app JS about 26 kB, MapLibre about 288 kB (its own chunk, cached separately), CSS about 17 kB (including MapLibre's). Fonts (Inter 400/600 with tabular figures, Noto Sans Devanagari for Hindi) load from Google Fonts (`display=swap`) with a system fallback; formulas use the system monospace. The map worker is 508 kB uncompressed.
 
 ## What's on screen
 
-- **Header**: KPI tiles computed only from `GET /lakes`: lakes monitored, count of very high / high lakes, settlements, bridges and hydro in the flood path (sums of `downstream.exposed_counts`, with the at-risk counts below), and the newest `risk.data_until`. The disclaimer is in the footer.
-- **Sidebar**: lakes ranked by `risk.score`, with the risk level, latest area and an area sparkline. Hollow points are partial-coverage years.
+- **Header**: four KPI tiles computed only from `GET /lakes`: very high / high lakes (of all watched), settlements in the flood path, bridges · hydro in the flood path (sums of `downstream.exposed_counts`, with the at-risk counts below), and the newest `risk.data_until`. The disclaimer is in the footer.
+- **Sidebar**: lakes ranked by `risk.score`: name, Hindi name, score and level. The list scrolls for any number of lakes.
 - **Map**: Esri World Imagery by default, or the OSM map (desaturated). The time-lapse player (previous / play / next, a year slider with one dot per year) shows the selected year's outline over faint outlines of earlier years; partial years are dashed and years without an outline are struck through on the slider. Also shown: RGI 7.0 glaciers, the outlet and spill path, the flood path, the expected and severe corridors, and exposed assets coloured by status (click one for details).
-- **Risk tab**: the score written out as `score = 100 × size × likelihood`, then every factor with its value, rule, 0–1 score bar, weight, note, why it matters and source links. Below that, the replay of the score by season (each season scored only with the data available then) and the method.
-- **Growth tab**: area by year with ± uncertainty whiskers, partial and no-data years flagged, the trend factor, and a table of the yearly measurements.
-- **Downstream exposure tab**: the expected and severe peak discharge, with the empirical relation and source for each; exposed-asset counts; the first asset and first settlement reached; and OpenStreetMap gaps, if any. Then a nearest-first table with kind filters (click a row to fly to it on the map), followed by the caveats.
+- **Risk tab**: the score written out as `score = 100 × size × likelihood`, then every factor with its value, 0–1 score bar and weight; the rule, note, why it matters and source links sit under **Details**. Below that, the replay of the score by season (each season scored only with the data available then) and the method.
+- **Growth tab**: area by year with ± uncertainty whiskers, partial and no-data years flagged, the trend factor, and a table of the yearly measurements (**More columns** adds ±, coverage and clear scenes).
+- **Downstream exposure tab**: the expected and severe peak discharge, with the empirical relation and source for each; exposed-asset counts; the first asset and first settlement reached; and OpenStreetMap gaps, if any. Then a nearest-first table with kind filters (click a row to fly to it on the map; **More columns** adds depth and height above flood), followed by the caveats (collapsed).
+- **Data & evidence tab**: per season, from the index and the `outlines` layer's feature properties: status, area ± uncertainty, coverage, clear scenes used / found and the scene date range, with a **View imagery** link that opens Copernicus Browser at the lake (Sentinel-2 L2A true colour, limited to that season's scene dates). Sources (Sentinel-2 L2A via AWS Open Data / Earth Search) and a link to the method in the project README.
+- **Map popups**: opening an asset popup collapses the Layers box (it reopens when the popup closes) and pans the map so no overlay covers the popup.
 - **Alerts tab**: a scenario selector and a **Dry run — don't send to real phones** checkbox (checked by default), then **Simulate burst** and `POST /trigger` with `source: "simulation"` and `dry_run`.
   - A dry run takes one confirmation. The server builds, logs and voices the plan but sends nothing, and records each delivery as `dry_run`.
   - A live alert takes **two** confirmations. Cancel has focus, so pressing Enter doesn't send.
@@ -77,7 +79,7 @@ src/
     LakeList.tsx    ranked sidebar
     MapView.tsx     map, layer toggles, time-lapse
     Panel.tsx       lake header and tabs
-    RiskTab.tsx  GrowthTab.tsx  ExposureTab.tsx  AlertsTab.tsx
+    RiskTab.tsx  GrowthTab.tsx  ExposureTab.tsx  EvidenceTab.tsx  AlertsTab.tsx
     charts.tsx      ReplayChart, GrowthChart, Sparkline (inline SVG with hover tooltips)
     Chrome.tsx      header and footer (sources)
     SignIn.tsx      officials sign-in prompt and header sign-out

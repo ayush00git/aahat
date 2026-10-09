@@ -3,7 +3,7 @@ import { api } from "./api";
 import { Footer, Header } from "./components/Chrome";
 import { LakeList, rankLakes } from "./components/LakeList";
 import { MapView } from "./components/MapView";
-import { Panel, type LakeDetail, type TabId } from "./components/Panel";
+import { Panel, TAB_IDS, type LakeDetail, type TabId } from "./components/Panel";
 import { SignInPrompt } from "./components/SignIn";
 import { ErrorMsg, Loading } from "./components/ui";
 import type { MapController } from "./map";
@@ -59,7 +59,6 @@ function loadLake(id: string): Promise<Loaded> {
   return p;
 }
 
-const TAB_IDS: TabId[] = ["risk", "growth", "exposure", "alerts"];
 
 /** Hash route: #/<lake-id>/<tab>. Works under any base path. */
 function readHash(): { id: string | null; tab: TabId } {
@@ -184,6 +183,7 @@ export function App() {
         <Panel
           lake={lake}
           detail={loaded?.detail ?? null}
+          layers={loaded?.layers ?? null}
           loading={loading}
           tab={tab}
           onTab={setTab}

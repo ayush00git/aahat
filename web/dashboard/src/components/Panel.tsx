@@ -1,17 +1,21 @@
 import { dateOnly, km2, num } from "../format";
-import type { DownstreamFile, Impact, Lake, RiskFile } from "../types";
+import type { DownstreamFile, Impact, Lake, LakeLayers, RiskFile } from "../types";
 import { AlertsTab } from "./AlertsTab";
+import { EvidenceTab } from "./EvidenceTab";
 import { ExposureTab } from "./ExposureTab";
 import { GrowthTab } from "./GrowthTab";
 import { RiskTab } from "./RiskTab";
 import { ErrorMsg, LevelBadge, Loading } from "./ui";
 
-export type TabId = "risk" | "growth" | "exposure" | "alerts";
+export type TabId = "risk" | "growth" | "exposure" | "evidence" | "alerts";
+
+export const TAB_IDS: TabId[] = ["risk", "growth", "exposure", "evidence", "alerts"];
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "risk", label: "Risk" },
   { id: "growth", label: "Growth" },
   { id: "exposure", label: "Downstream exposure" },
+  { id: "evidence", label: "Data & evidence" },
   { id: "alerts", label: "Alerts" },
 ];
 
@@ -25,6 +29,7 @@ export interface LakeDetail {
 export function Panel({
   lake,
   detail,
+  layers,
   loading,
   tab,
   onTab,
@@ -33,6 +38,7 @@ export function Panel({
 }: {
   lake: Lake;
   detail: LakeDetail | null;
+  layers: LakeLayers | null;
   loading: boolean;
   tab: TabId;
   onTab: (t: TabId) => void;
@@ -114,13 +120,20 @@ export function Panel({
         ))}
       </div>
       <div class="tabpanel" id="tabpanel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {renderTab(tab, lake, detail, loading, onFocusImpact)}
+        {renderTab(tab, lake, detail, layers, loading, onFocusImpact)}
       </div>
     </aside>
   );
 }
 
-function renderTab(tab: TabId, lake: Lake, d: LakeDetail | null, loading: boolean, onFocus: (im: Impact) => void) {
+function renderTab(
+  tab: TabId,
+  lake: Lake,
+  d: LakeDetail | null,
+  layers: LakeLayers | null,
+  loading: boolean,
+  onFocus: (im: Impact) => void,
+) {
   switch (tab) {
     case "risk":
       if (d?.risk) return <RiskTab risk={d.risk} />;
@@ -132,6 +145,9 @@ function renderTab(tab: TabId, lake: Lake, d: LakeDetail | null, loading: boolea
       if (d?.impacts) return <ExposureTab lake={lake} downstream={d.downstream} impacts={d.impacts} onFocus={onFocus} />;
       if (d?.errors.impacts) return <ErrorMsg msg={`Exposure unavailable: ${d.errors.impacts}`} />;
       return loading ? <Loading what="downstream exposure" /> : null;
+    case "evidence":
+      if (!layers && loading) return <Loading what="season records" />;
+      return <EvidenceTab lake={lake} risk={d?.risk ?? null} outlines={layers?.outlines} layersError={d?.errors.layers} />;
     case "alerts":
       return <AlertsTab lake={lake} downstream={d?.downstream ?? null} />;
   }

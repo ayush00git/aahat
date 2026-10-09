@@ -1,5 +1,4 @@
 import type { ComponentChildren } from "preact";
-import { LEVEL_COLOR } from "../colors";
 import { dateOnly, dateTime, num } from "../format";
 import type { ImpactKind, Lake, RiskLevel } from "../types";
 import { AuthStatus } from "./SignIn";
@@ -69,36 +68,35 @@ export function Header({ lakes, generatedAt }: { lakes: Lake[] | null; generated
 
       <dl class="kpis" aria-label="Summary across all watched lakes">
         <Kpi
-          label="Lakes monitored"
-          value={v(ls.length)}
-          sub="ranked by risk score"
-        />
-        <Kpi
           label="Very high / high risk"
           value={
-            <span class="kpi-levels">
-              <span>
-                <span class="kpi-dot" style={{ background: LEVEL_COLOR.very_high }} aria-hidden="true" />
-                {v(level("very_high"))}
-              </span>
-              <span class="kpi-slash" aria-hidden="true">
-                /
-              </span>
-              <span>
-                <span class="kpi-dot" style={{ background: LEVEL_COLOR.high }} aria-hidden="true" />
-                {v(level("high"))}
-              </span>
-            </span>
+            <>
+              {v(level("very_high"))}
+              <span class="kpi-slash"> / </span>
+              {v(level("high"))}
+            </>
           }
-          sub={ready ? `${level("moderate")} moderate · ${level("low")} low` : undefined}
+          sub={ready ? `of ${num(ls.length)} lakes watched` : undefined}
         />
-        <Kpi label="Settlements in flood path" value={v(settle.path)} sub={ready ? `+${num(settle.risk)} at risk` : undefined} />
-        <Kpi label="Bridges in flood path" value={v(bridge.path)} sub={ready ? `+${num(bridge.risk)} at risk` : undefined} />
-        <Kpi label="Hydro in flood path" value={v(hydro.path)} sub={ready ? `+${num(hydro.risk)} at risk` : undefined} />
+        <Kpi
+          label="Settlements in flood path"
+          value={v(settle.path)}
+          sub={ready ? `${num(settle.risk)} more at risk` : undefined}
+        />
+        <Kpi
+          label="Bridges · hydro in flood path"
+          value={
+            <>
+              {v(bridge.path)}
+              <span class="kpi-slash"> · </span>
+              {v(hydro.path)}
+            </>
+          }
+          sub={ready ? `${num(bridge.risk)} · ${num(hydro.risk)} more at risk` : undefined}
+        />
         <Kpi
           label="Latest satellite data"
           value={dataUntil ? dateOnly(dataUntil) : "—"}
-          sub={generatedAt ? `index ${dateOnly(generatedAt)}` : undefined}
           title={generatedAt ? `Index generated ${dateTime(generatedAt)}` : undefined}
         />
       </dl>
@@ -116,9 +114,9 @@ export function Footer({ apiBase }: { apiBase: string }) {
     <footer class="app-footer">
       <span class="disclaimer">Screening estimates from satellite data; not a substitute for field assessment.</span>
       <span class="spacer" />
-      <span class="k">Sources</span>
+      <span class="muted">Sources</span>
       <a href="https://registry.opendata.aws/sentinel-2-l2a-cogs/" target="_blank" rel="noopener noreferrer">
-        Sentinel-2 (Copernicus, via AWS Open Data)
+        Sentinel-2
       </a>
       <a href="https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM" target="_blank" rel="noopener noreferrer">
         Copernicus DEM GLO-30
@@ -130,7 +128,7 @@ export function Footer({ apiBase }: { apiBase: string }) {
         OpenStreetMap
       </a>
       <a href="https://www.nrsc.gov.in/" target="_blank" rel="noopener noreferrer">
-        NRSC GLOF reports (benchmarks)
+        NRSC
       </a>
       <span class="muted api-base">API {apiBase}</span>
     </footer>

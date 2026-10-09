@@ -1,7 +1,8 @@
 import { dateOnly, km2, num, YEAR_STATUS_LABEL } from "../format";
 import type { Lake, RiskFile } from "../types";
 import { GrowthChart } from "./charts";
-import { Section } from "./ui";
+import { MoreToggle, Section } from "./ui";
+import { useState } from "preact/hooks";
 
 export function GrowthTab({ lake, risk }: { lake: Lake; risk: RiskFile | null }) {
   const years = [...lake.years].sort((a, b) => a.year - b.year);
@@ -9,6 +10,7 @@ export function GrowthTab({ lake, risk }: { lake: Lake; risk: RiskFile | null })
   const missing = years.filter((y) => y.status === "no_data" || y.status === "not_found").map((y) => y.year);
   const growth = risk?.latest.factors.find((f) => f.key === "growth");
   const dataUntil = risk?.latest.data_until ?? lake.risk?.data_until;
+  const [more, setMore] = useState(false);
 
   return (
     <div class="tab-body">
@@ -29,50 +31,47 @@ export function GrowthTab({ lake, risk }: { lake: Lake; risk: RiskFile | null })
 
       <Section title="Lake area by year">
         <GrowthChart years={years} />
-        <p class="caption">
-          Whiskers: ± measurement uncertainty. Filled points: full-coverage seasons (joined by the line). Hollow points:
-          partial coverage (cloud or snow), not used for the trend.
-          {missing.length > 0 && " Crosses: no usable outline."}
-        </p>
-        {partial.length > 0 && (
-          <p class="flag">
-            Partial years: <b>{partial.join(", ")}</b>
-          </p>
-        )}
         {growth && (
-          <p class="small">
-            <span class="k">Trend</span> {num(growth.value, 2)} {growth.unit}
-            {growth.note ? ` · ${growth.note}` : ""}
+          <p class="lead">
+            Trend <b>{num(growth.value, 2)} {growth.unit}</b>
           </p>
         )}
+        {partial.length > 0 && <p class="note">Partial coverage: {partial.join(", ")} (not used for the trend).</p>}
+        <details class="more">
+          <summary>How to read the chart</summary>
+          <p>
+            Whiskers: ± measurement uncertainty. Filled points: full-coverage seasons, joined by the line. Hollow points:
+            partial coverage (cloud or snow).{missing.length > 0 && " Crosses: no usable outline."}
+          </p>
+          {growth?.note && <p>{growth.note}</p>}
+        </details>
       </Section>
 
-      <Section title="Yearly measurements">
-        <table class="table compact">
+      <Section title="Yearly measurements" aside={<MoreToggle on={more} onToggle={() => setMore(!more)} />}>
+        <table class="table">
           <thead>
             <tr>
               <th>Year</th>
               <th class="num">Area</th>
-              <th class="num">±</th>
-              <th class="num">Coverage</th>
-              <th class="num">Clear scenes</th>
+              {more && <th class="num">±</th>}
+              {more && <th class="num">Coverage</th>}
+              {more && <th class="num">Clear scenes</th>}
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            {years.map((y) => (
-              <tr key={y.year} class={y.status !== "ok" ? "row-flag" : ""}>
+            {[...years].reverse().map((y) => (
+              <tr key={y.year}>
                 <td>{y.year}</td>
                 <td class="num">{km2(y.area_m2)}</td>
-                <td class="num">{km2(y.uncertainty_m2)}</td>
-                <td class="num">{y.coverage !== null ? `${num(y.coverage * 100, 0)}%` : "—"}</td>
-                <td class="num">{num(y.scenes_clear)}</td>
-                <td>{YEAR_STATUS_LABEL[y.status] ?? y.status}</td>
+                {more && <td class="num">{km2(y.uncertainty_m2)}</td>}
+                {more && <td class="num">{y.coverage !== null ? `${num(y.coverage * 100, 0)}%` : "—"}</td>}
+                {more && <td class="num">{num(y.scenes_clear)}</td>}
+                <td class={y.status !== "ok" ? "muted" : ""}>{YEAR_STATUS_LABEL[y.status] ?? y.status}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p class="muted small">Areas from late-summer/autumn Sentinel-2 scenes (NDWI water mask), one outline per season.</p>
       </Section>
     </div>
   );

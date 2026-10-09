@@ -155,6 +155,10 @@ export class MapController {
   private lakeMarkers = new globalThis.Map<string, Marker>();
   private impacts: Impact[] = [];
   private popup: Popup | null = null;
+  /** Called when the asset popup opens or closes (the view collapses the Layers box). */
+  onPopupChange: ((open: boolean) => void) | null = null;
+  /** Screen rectangles of overlays drawn over the map; popups are panned clear of them. */
+  overlayRects: (() => DOMRect[]) | null = null;
   private basemap: Basemap = "satellite";
   private layers: LakeLayers = {};
 
@@ -434,15 +438,62 @@ export class MapController {
 
   private openImpactPopup(im: Impact) {
     this.closePopup();
-    this.popup = new Popup({ closeButton: true, maxWidth: "300px", offset: 10 })
+    const p = new Popup({ closeButton: true, maxWidth: "300px", offset: 10 })
       .setLngLat([im.lon, im.lat])
       .setDOMContent(impactPopup(im))
       .addTo(this.map);
+    this.popup = p;
+    p.on("close", () => {
+      if (this.popup === p) this.popup = null;
+      this.onPopupChange?.(false);
+    });
+    this.onPopupChange?.(true);
+    // Wait for any fly-to to finish and for the view to collapse its overlays, then pan clear.
+    const reveal = () => requestAnimationFrame(() => requestAnimationFrame(() => this.revealPopup(p)));
+    if (this.map.isMoving()) this.map.once("moveend", reveal);
+    else reveal();
+  }
+
+  /**
+   * Pans the map so the popup is not covered by an overlay (map controls, the
+   * Layers box, the time-lapse bar, the zoom buttons) or cut off at the edge.
+   */
+  private revealPopup(p: Popup) {
+    if (this.popup !== p || !p.isOpen()) return;
+    const box = this.map.getContainer().getBoundingClientRect();
+    const pr = p.getElement().getBoundingClientRect();
+    const gap = 8;
+    let dx = 0;
+    let dy = 0;
+    for (const r of this.overlayRects?.() ?? []) {
+      if (!r.width || !r.height) continue;
+      const hit = pr.left < r.right && pr.right > r.left && pr.top < r.bottom && pr.bottom > r.top;
+      if (!hit) continue;
+      // Smallest move that clears this overlay: down, up, right or left.
+      const moves: [number, number][] = [
+        [0, r.bottom + gap - pr.top],
+        [0, r.top - gap - pr.bottom],
+        [r.right + gap - pr.left, 0],
+        [r.left - gap - pr.right, 0],
+      ];
+      const fits = ([mx, my]: [number, number]) =>
+        pr.left + mx >= box.left && pr.right + mx <= box.right && pr.top + my >= box.top && pr.bottom + my <= box.bottom;
+      const ok = moves.filter(fits);
+      const pick = (ok.length ? ok : moves).reduce((a, b) => (Math.hypot(...a) <= Math.hypot(...b) ? a : b));
+      if (Math.abs(pick[0]) > Math.abs(dx)) dx = pick[0];
+      if (Math.abs(pick[1]) > Math.abs(dy)) dy = pick[1];
+    }
+    // Keep it inside the map as well.
+    if (pr.top + dy < box.top + gap) dy = box.top + gap - pr.top;
+    if (pr.left + dx < box.left + gap) dx = box.left + gap - pr.left;
+    if (pr.right + dx > box.right - gap) dx = box.right - gap - pr.right;
+    if (dx || dy) this.map.panBy([-dx, -dy], { duration: 350 });
   }
 
   private closePopup() {
-    this.popup?.remove();
+    const p = this.popup;
     this.popup = null;
+    p?.remove();
   }
 
   resize() {

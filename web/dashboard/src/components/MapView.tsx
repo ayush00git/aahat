@@ -46,12 +46,33 @@ export function MapView({
   const [year, setYear] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [legendOpen, setLegendOpen] = useState(() => window.innerWidth > 1100);
+  const autoCollapsed = useRef(false);
 
   // Create the map once.
   useEffect(() => {
     if (!box.current) return;
     const c = new MapController(box.current);
     ctrl.current = c;
+    // Collapse the Layers box while an asset popup is open (and reopen it after,
+    // if it was open), then pan the popup clear of whatever overlays remain.
+    c.onPopupChange = (open) => {
+      if (open) {
+        setLegendOpen((was) => {
+          if (was) autoCollapsed.current = true;
+          return false;
+        });
+      } else if (autoCollapsed.current) {
+        autoCollapsed.current = false;
+        setLegendOpen(true);
+      }
+    };
+    c.overlayRects = () => {
+      const wrap = box.current?.parentElement;
+      if (!wrap) return [];
+      return [...wrap.querySelectorAll<HTMLElement>(".map-overlay, .maplibregl-ctrl-top-right .maplibregl-ctrl, .map-error")].map(
+        (e) => e.getBoundingClientRect(),
+      );
+    };
     onReady(c);
     const ro = new ResizeObserver(() => c.resize());
     ro.observe(box.current);
@@ -172,7 +193,12 @@ export function MapView({
 
       {lake && (
         <div class={`map-overlay map-legend${legendOpen ? "" : " closed"}`} aria-label="Map layers">
-          <button type="button" class="lg-toggle" onClick={() => setLegendOpen(!legendOpen)} aria-expanded={legendOpen}>
+          <button type="button" class="lg-toggle" onClick={() => {
+              autoCollapsed.current = false;
+              setLegendOpen(!legendOpen);
+            }}
+            aria-expanded={legendOpen}
+          >
             <span>Layers</span>
             <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" class={legendOpen ? "chev up" : "chev"}>
               <path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.6" />

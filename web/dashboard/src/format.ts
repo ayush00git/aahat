@@ -98,6 +98,13 @@ export const STATUS_LABEL: Record<ImpactStatus, string> = {
   outside: "Outside",
 };
 
+/** Table-width labels for the same statuses. */
+export const STATUS_SHORT: Record<ImpactStatus, string> = {
+  in_flood_path: "In path",
+  at_risk: "At risk",
+  outside: "Outside",
+};
+
 export const OUTCOME_LABEL: Record<string, string> = {
   flooded: "flooded",
   margin: "margin",

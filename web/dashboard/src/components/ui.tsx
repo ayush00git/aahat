@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { hostOf, LEVEL_LABEL, splitLinks, STATUS_LABEL } from "../format";
+import { hostOf, LEVEL_LABEL, splitLinks, STATUS_LABEL, STATUS_SHORT } from "../format";
 import type { ImpactStatus, RiskLevel } from "../types";
 
 export function LevelBadge({ level, compact }: { level: RiskLevel | null | undefined; compact?: boolean }) {
@@ -12,11 +12,12 @@ export function LevelBadge({ level, compact }: { level: RiskLevel | null | undef
   );
 }
 
-export function StatusBadge({ status }: { status: ImpactStatus }) {
+/** `short` uses the abbreviated label (tables); the full label stays in the tooltip. */
+export function StatusBadge({ status, short }: { status: ImpactStatus; short?: boolean }) {
   return (
-    <span class={`badge status-${status}`}>
+    <span class={`badge status-${status}`} title={short ? STATUS_LABEL[status] : undefined}>
       <span class="badge-dot" aria-hidden="true" />
-      {STATUS_LABEL[status]}
+      {short ? STATUS_SHORT[status] : STATUS_LABEL[status]}
     </span>
   );
 }
@@ -86,5 +87,14 @@ export function Section({ title, aside, children }: { title: string; aside?: Com
       </header>
       {children}
     </section>
+  );
+}
+
+/** "More columns" switch for tables that show their essential columns by default. */
+export function MoreToggle({ on, onToggle, label = "columns" }: { on: boolean; onToggle: () => void; label?: string }) {
+  return (
+    <button type="button" class="link-btn" aria-pressed={on} onClick={onToggle}>
+      {on ? `Fewer ${label}` : `More ${label}`}
+    </button>
   );
 }
