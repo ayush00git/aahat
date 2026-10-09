@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { url } from '../api';
-import { useI18n } from '../i18n';
-import { num, time, wholeMinutes } from '../format';
+import { savedThreats, url } from '../api';
+import { useI18n, type Lang, type Strings } from '../i18n';
+import { lakeName, num, placeName, time, wholeMinutes } from '../format';
+import { rememberedNames } from '../coords';
+import { placeLink } from '../share';
+import { ShareButton } from './Share';
 import { href } from '../router';
 import { ACTIONS } from '../content/safety';
 import { EmergencyNumbers } from './Actions';
@@ -36,6 +39,19 @@ export function alertHash(p: AlertPayload): string {
   set('event', p.event_id);
   set('at', p.received_at);
   return `#/alert?${q}`;
+}
+
+/**
+ * The share text for an alert. Uses the lake and village names from the
+ * saved answer for this village when there is one, else the alert's title.
+ */
+function alertShareText(t: Strings, lang: Lang, title: string, minutes: number | null, place: string | null, lakeId: string | null): string {
+  const min = minutes !== null ? wholeMinutes(minutes) : null;
+  const saved = place ? savedThreats(place) : null;
+  const th = lakeId && saved ? [...saved.threats, ...(saved.nearby ?? [])].find((x) => x.lake_id === lakeId) : undefined;
+  const names = saved && (saved.name || saved.name_hi) ? saved : place ? rememberedNames(place) : null;
+  if (th && names && place) return t.shareThreat(lakeName(th, lang), placeName({ ...names, osm: place }, lang), min);
+  return t.shareAlert(title, min);
 }
 
 /** Only play audio from our API (a path) or an https URL. */
@@ -135,6 +151,12 @@ export function Alert({ params }: { params: URLSearchParams }) {
       </ol>
 
       <EmergencyNumbers invert />
+
+      <ShareButton
+        invert
+        text={alertShareText(t, lang, title, minutes, place, params.get('lake'))}
+        link={place ? placeLink(place) : `${location.origin}${location.pathname}`}
+      />
 
       {at && <p class="alert-small">{t.alertReceived(time(at, lang))}</p>}
 

@@ -176,6 +176,9 @@ export interface LakeSummary {
   name_hi: string;
   district: string;
   risk_level: RiskLevel | null;
+  /** Lake position from the API; null in copies saved by older app versions. */
+  lat: number | null;
+  lon: number | null;
 }
 
 interface LakeIndex {
@@ -184,6 +187,8 @@ interface LakeIndex {
     name: string;
     name_hi: string;
     district: string;
+    lat?: number | null;
+    lon?: number | null;
     risk: { level: RiskLevel; score: number | null } | null;
   }[];
 }
@@ -197,7 +202,15 @@ export async function getLakes(): Promise<LakeSummary[]> {
     const idx = await request<LakeIndex>('/lakes');
     const lakes = [...idx.lakes]
       .sort((a, b) => (b.risk?.score ?? -1) - (a.risk?.score ?? -1))
-      .map((l) => ({ id: l.id, name: l.name, name_hi: l.name_hi, district: l.district, risk_level: l.risk?.level ?? null }));
+      .map((l) => ({
+        id: l.id,
+        name: l.name,
+        name_hi: l.name_hi,
+        district: l.district,
+        risk_level: l.risk?.level ?? null,
+        lat: typeof l.lat === 'number' ? l.lat : null,
+        lon: typeof l.lon === 'number' ? l.lon : null,
+      }));
     save('lakes', lakes);
     return lakes;
   } catch (err) {

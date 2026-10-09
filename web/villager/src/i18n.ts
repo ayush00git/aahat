@@ -6,6 +6,11 @@ import type { RiskLevel } from './api';
 
 export type Lang = 'hi' | 'en';
 
+/** "X झील", unless the Hindi name already says झील. */
+const jheel = (lake: string) => (lake.includes('झील') ? lake : `${lake} झील`);
+/** A sentence without its own final full stop / danda, so we can add ours. */
+const bare = (s: string) => s.trim().replace(/[।.!]+$/, '');
+
 const hi = {
   appName: 'आहट',
   tagline: 'हिमनद झील बाढ़ चेतावनी',
@@ -40,8 +45,15 @@ const hi = {
   unknownBody: 'यह गाँव हमारी निगरानी वाली किसी झील के विश्लेषण में शामिल नहीं है।',
   notCoveredTitle: 'यह गाँव हमारी निगरानी वाली किसी झील के बाढ़ मार्ग के नीचे नहीं है',
   notCoveredBody:
-    'हम अभी नीचे दी गई झीलों पर उपग्रह से नज़र रखते हैं। निगरानी का दायरा बढ़ाया जा रहा है। भारी बारिश, बादल फटने या दूसरी नदियों से बाढ़ फिर भी आ सकती है — ज़िला प्रशासन की चेतावनी हमेशा मानें।',
+    'हम अभी चुनी हुई हिमनद झीलों पर उपग्रह से नज़र रखते हैं। निगरानी का दायरा बढ़ाया जा रहा है। भारी बारिश, बादल फटने या दूसरी नदियों से बाढ़ फिर भी आ सकती है — ज़िला प्रशासन की चेतावनी हमेशा मानें।',
   monitoredLakes: 'निगरानी वाली झीलें',
+  nearestLakes: 'आपके पास की निगरानी वाली झीलें',
+  nearestUncovered:
+    'आपका गाँव इनमें से किसी झील के बाढ़ मार्ग पर नहीं है। ये झीलें पास हैं, पर हमारे विश्लेषण के अनुसार इनकी बाढ़ आपके गाँव तक नहीं पहुँचती।',
+  nearestSafe: 'हमारे विश्लेषण के अनुसार इनमें से किसी झील की बाढ़ आपके गाँव के मुख्य स्थान तक नहीं पहुँचती।',
+  straightKm: (km: string) => `~${km} किमी`,
+  straightLabel: 'सीधी दूरी',
+  straightNote: 'दूरी सीधी रेखा में (सीधी दूरी) है, नदी के रास्ते की नहीं।',
   lakesError: 'झीलों की सूची नहीं मिल सकी।',
   lakeRisk: (level: string) => `जोखिम: ${level}`,
   dangerTitle: (n: number) => (n === 1 ? 'इस झील से बाढ़ का ख़तरा' : `इन ${n} झीलों से बाढ़ का ख़तरा`),
@@ -79,6 +91,22 @@ const hi = {
   openMap: 'नक्शे पर देखें',
   subscribeCta: 'चेतावनी पाने के लिए जुड़ें',
   subscribedHere: 'इस फ़ोन से इस गाँव के लिए चेतावनी चालू है',
+
+  shareWhatsApp: 'WhatsApp पर भेजें',
+  shareThreat: (lake: string, place: string, min: number | null) =>
+    `आहट चेतावनी: ${jheel(lake)} से बाढ़ का खतरा।` +
+    (min !== null ? ` ${place} तक पानी ~${min} मिनट में पहुँच सकता है।` : '') +
+    ' ऊँचे स्थान पर जाएँ। जानकारी:',
+  shareNearby: (lake: string, place: string, min: number | null) =>
+    `आहट: ${jheel(lake)} की बाढ़ ${place} के पास से गुज़र सकती है` +
+    (min !== null ? ` — नदी तक पानी ~${min} मिनट में` : '') +
+    '। नदी किनारे से दूर रहें। जानकारी:',
+  shareSafe: (place: string) =>
+    `आहट: हमारे विश्लेषण के अनुसार ${place} किसी निगरानी वाली हिमनद झील के जोखिम वाले बाढ़ मार्ग में नहीं है। ज़िला प्रशासन की चेतावनी हमेशा मानें। जानकारी:`,
+  shareAlert: (title: string, min: number | null) =>
+    `आहट चेतावनी: ${bare(title)}।` +
+    (min !== null ? ` पानी ~${min} मिनट में पहुँच सकता है।` : '') +
+    ' ऊँचे स्थान पर जाएँ। जानकारी:',
 
   whatToDo: 'क्या करें',
   emergency: 'आपातकालीन नंबर',
@@ -176,8 +204,15 @@ const en: Strings = {
   unknownBody: 'This village is not covered by the analysis of any lake we monitor.',
   notCoveredTitle: 'This village is not below the flood path of any lake we monitor',
   notCoveredBody:
-    'We currently watch the lakes listed below by satellite, and coverage is expanding. Floods from heavy rain, cloudbursts or other rivers can still happen — always follow district administration warnings.',
+    'We currently watch selected glacial lakes by satellite, and coverage is expanding. Floods from heavy rain, cloudbursts or other rivers can still happen — always follow district administration warnings.',
   monitoredLakes: 'Lakes we monitor',
+  nearestLakes: 'Monitored lakes near you',
+  nearestUncovered:
+    "Your village is not on the flood path of any of these lakes. They are nearby, but by our analysis their floods do not reach your village.",
+  nearestSafe: "By our analysis, the flood from none of these lakes reaches your village's main point.",
+  straightKm: (km) => `~${km} km`,
+  straightLabel: 'straight-line',
+  straightNote: 'Straight-line distance, not along the river.',
   lakesError: 'Could not load the list of lakes.',
   lakeRisk: (level) => `Risk: ${level}`,
   dangerTitle: (n) => (n === 1 ? 'Flood danger from this lake' : `Flood danger from these ${n} lakes`),
@@ -215,6 +250,22 @@ const en: Strings = {
   openMap: 'See on map',
   subscribeCta: 'Sign up for warnings',
   subscribedHere: 'Warnings for this village are on for this phone',
+
+  shareWhatsApp: 'Send on WhatsApp',
+  shareThreat: (lake, place, min) =>
+    `Aahat warning: flood danger from ${lake}.` +
+    (min !== null ? ` Water could reach ${place} in ~${min} min.` : '') +
+    ' Move to high ground. Info:',
+  shareNearby: (lake, place, min) =>
+    `Aahat: the flood from ${lake} may pass close to ${place}` +
+    (min !== null ? ` — water could reach the river in ~${min} min` : '') +
+    '. Keep away from the riverbank. Info:',
+  shareSafe: (place) =>
+    `Aahat: by our analysis, ${place} is not in the risky flood path of any monitored glacial lake. Always follow district administration warnings. Info:`,
+  shareAlert: (title, min) =>
+    `Aahat warning: ${bare(title)}.` +
+    (min !== null ? ` Water could arrive in ~${min} min.` : '') +
+    ' Move to high ground. Info:',
 
   whatToDo: 'What to do',
   emergency: 'Emergency numbers',

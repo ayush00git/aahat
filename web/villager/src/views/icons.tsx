@@ -150,3 +150,27 @@ export const IconPause = (p: P) => (
     <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
   </Svg>
 );
+
+/** Speech bubble with a phone handset: WhatsApp-style share. Drawn here, not a brand asset. */
+export const IconWhatsApp = ({ size = 24, class: cls }: P) => (
+  <svg
+    class={cls ? `icon ${cls}` : 'icon'}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path
+      d="M12 3a8.5 8.5 0 1 1-4.3 15.8L3.5 20l1.2-4A8.5 8.5 0 0 1 12 3Z"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linejoin="round"
+    />
+    <path
+      fill="currentColor"
+      d="M9.3 7.6c.3-.1.6 0 .7.3l.8 1.8c.1.3 0 .6-.2.8l-.6.7c.6 1.2 1.6 2.2 2.8 2.8l.7-.6c.2-.2.5-.3.8-.2l1.8.8c.3.1.4.4.3.7l-.3 1c-.2.6-.7.9-1.3.9A7 7 0 0 1 8 9.7c0-.6.3-1.1.9-1.3Z"
+    />
+  </svg>
+);
