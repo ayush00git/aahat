@@ -92,10 +92,21 @@ def run_lake(
     terrain = Terrain(grid)
     lake_dir = out_dir / "lakes" / lake.id
     lake_dir.mkdir(parents=True, exist_ok=True)
+    grid_meta = {"crs": grid.crs.to_string(), "bounds": list(grid.bounds), "res": grid.res}
+    series_path = lake_dir / "series.json"
+    # Merge into earlier runs on the same grid, so a refresh only recomputes the years asked for.
+    by_year: dict[int, dict] = {}
+    if series_path.exists():
+        old = json.loads(series_path.read_text())
+        if old.get("grid") == grid_meta:
+            by_year = {r["year"]: r for r in old["years"]}
     records: list[LakeYear] = []
     for year in years:
         rec, comp, ext = lake_year(lake, year, terrain, p, max_scenes)
         records.append(rec)
+        by_year[year] = asdict(rec)
+        series = {"lake": asdict(lake), "grid": grid_meta, "years": [by_year[y] for y in sorted(by_year)]}
+        series_path.write_text(json.dumps(series, indent=1))
         log.info("%s %d: %s area=%s m2 +/- %s", lake.id, year, rec.status, rec.area_m2, rec.uncertainty_m2)
         if ext is not None:
             feature = {
@@ -108,10 +119,4 @@ def run_lake(
             from .quicklook import save_quicklook
 
             save_quicklook(comp, ext, lake_dir / f"{year}.png", title=f"{lake.name} {year}")
-    series = {
-        "lake": asdict(lake),
-        "grid": {"crs": grid.crs.to_string(), "bounds": grid.bounds, "res": grid.res},
-        "years": [asdict(r) for r in records],
-    }
-    (lake_dir / "series.json").write_text(json.dumps(series, indent=1))
     return records

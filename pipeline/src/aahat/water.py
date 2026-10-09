@@ -77,9 +77,8 @@ def read_clear(scene: Scene, grid: Grid) -> np.ndarray:
 
 
 def observe(scene: Scene, clear: np.ndarray, grid: Grid, terrain: Terrain, p: WaterParams) -> SceneObs:
-    green = _reflectance(scene, "green", grid)
-    nir = _reflectance(scene, "nir", grid)
-    swir = _reflectance(scene, "swir16", grid)
+    with ThreadPoolExecutor(3) as pool:  # separate HTTP connections; throughput is often per-connection
+        green, nir, swir = pool.map(lambda k: _reflectance(scene, k, grid), ("green", "nir", "swir16"))
     with np.errstate(divide="ignore", invalid="ignore"):
         ndwi = (green - nir) / (green + nir)
         mndwi = (green - swir) / (green + swir)
