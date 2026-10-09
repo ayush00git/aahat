@@ -12,7 +12,7 @@ rsync -az --delete -e "ssh $SSHOPT" --exclude .venv --exclude out --exclude '__p
 scp -q $SSHOPT refresh.sh aahat-refresh.service aahat-refresh.timer "ec2-user@$PUBLIC_IP:/tmp/aahat-pipeline/"
 ssh $SSHOPT "ec2-user@$PUBLIC_IP" bash -s <<'REMOTE'
 set -euo pipefail
-sudo rsync -a --delete /tmp/aahat-pipeline/ /srv/aahat/pipeline/
+sudo rsync -a --delete --exclude .venv /tmp/aahat-pipeline/ /srv/aahat/pipeline/  # keep the venv: running jobs use it
 sudo mkdir -p /srv/aahat/cache   # DEM tiles and the OSM extract download here on the first run
 # 2 GB swap: filtering the OSM extract can outgrow a t4g.small's 2 GB of RAM
 if ! swapon --show | grep -q swapfile; then
