@@ -43,7 +43,6 @@ class LakeYear:
     first_day: str | None
     last_day: str | None
     params: dict
-    glacier_distance_m: float | None = None  # lake to nearest glacier ice (Sentinel-2 SCL); None if none seen
 
 
 def lake_focus(grid, seed_xy: tuple[float, float], radius_m: float) -> np.ndarray:
@@ -65,7 +64,9 @@ def lake_year(
     if not found:
         return LakeYear(lake.id, year, "no_data", None, None, None, None, 0, 0, None, None, asdict(p)), None, None
     seed = point_in_crs(lake.lon, lake.lat, grid.crs)
-    comp = composite(found, grid, terrain, p, max_scenes=max_scenes, focus=lake_focus(grid, seed, lake.aoi_radius_m / 2))
+    comp = composite(
+        found, grid, terrain, p, max_scenes=max_scenes, focus=lake_focus(grid, seed, lake.aoi_radius_m / 2)
+    )
     used = comp.inputs
     if not used:
         return (
@@ -96,7 +97,6 @@ def lake_year(
         len(used),
         *days,
         asdict(p),
-        None if ext.glacier_distance_m is None else round(ext.glacier_distance_m),
     )
     return rec, comp, ext
 
@@ -157,14 +157,17 @@ def build_index(out_dir: Path) -> dict:
         fc = {"type": "FeatureCollection", "features": outlines}
         (path.parent / "outlines.geojson").write_text(json.dumps(fc, ensure_ascii=False))
         years = [
-            {k: r.get(k) for k in ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear", "glacier_distance_m")}
+            {k: r.get(k) for k in ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear")}
             for r in s["years"]
         ]
         measured = [r for r in years if r["area_m2"] is not None]
         risk_path = path.parent / "risk.json"
         latest_risk = json.loads(risk_path.read_text()).get("latest") if risk_path.exists() else None
         risk = (
-            {k: latest_risk[k] for k in ("as_of_season", "data_until", "score", "level", "volume_m3", "peak_discharge_m3s")}
+            {
+                k: latest_risk[k]
+                for k in ("as_of_season", "data_until", "score", "level", "volume_m3", "peak_discharge_m3s")
+            }
             if latest_risk
             else None
         )

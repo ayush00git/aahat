@@ -54,7 +54,9 @@ def save_quicklook(comp: Composite, ext: LakeExtent | None, path: Path, title: s
             for geom in getattr(ext.polygon, "geoms", [ext.polygon]):
                 x, y = geom.exterior.xy
                 ax.plot(x, y, color="red", lw=1)
-        fig.suptitle(f"{title}: {ext.area_m2 / 1e6:.3f} km² ± {ext.uncertainty_m2 / 1e6:.3f}, coverage {ext.coverage:.0%}")
+        fig.suptitle(
+            f"{title}: {ext.area_m2 / 1e6:.3f} km² ± {ext.uncertainty_m2 / 1e6:.3f}, coverage {ext.coverage:.0%}"
+        )
     for ax in axes:
         ax.set_xticks([])
         ax.set_yticks([])

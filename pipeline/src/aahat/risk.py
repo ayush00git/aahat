@@ -27,7 +27,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
+from shapely.geometry import shape
 
+from .glaciers import RGI_DOI, GlacierProximity, glaciers_geojson, nearest_glacier
 from .laketerrain import LakeTerrain, TerrainParams, lake_terrain, outlet_geojson
 
 HUGGEL_2002 = "https://doi.org/10.1139/t01-099"
@@ -149,8 +151,8 @@ FACTORS: tuple[FactorSpec, ...] = (
         0.25,
         "A lake touching its glacier gets calving ice and ice avalanches. Rinzin et al. 2021 rate contact as "
         "high and within 500 m as medium; CWC's top class is a snout within 0.5 km.",
-        "Sentinel-2 snow/ice class in at least half of the season's cloud-free looks, patches of 0.05 km² or "
-        f"more (debris-covered ice is missed); thresholds from {RINZIN_2021} and {CWC_2024}",
+        "Randolph Glacier Inventory 7.0 outlines (c. 2000, so contact may be overstated where the glacier has "
+        f"since retreated; {RGI_DOI}); thresholds from {RINZIN_2021} and {CWC_2024}",
     ),
 )
 
@@ -223,7 +225,7 @@ def growth_as_of(years: list[dict], season: int) -> Growth:
     return Growth(pct, significant, note)
 
 
-def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int) -> RiskRecord | None:
+def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int, glacier_for=None) -> RiskRecord | None:
     """The score as it could have been computed right after `season`'s last scene."""
     past = [r for r in years if r["year"] <= season and r["area_m2"]]
     if not past:
@@ -233,7 +235,9 @@ def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int) -> Ri
     terrain: LakeTerrain = terrain_for(current["year"])
     volume = huggel_volume_m3(current["area_m2"])
     growth = growth_as_of(years, season)
-    gd = current.get("glacier_distance_m")
+    no_glacier = GlacierProximity(None, None, None, None)
+    glacier: GlacierProximity = glacier_for(current["year"]) if glacier_for else no_glacier
+    gd = glacier.distance_m
     values = {
         "volume": (volume, f"from {current['area_m2'] / 1e6:.3f} km² measured in {current['year']}", True),
         "growth": (None if growth.pct_per_yr is None else 5 * growth.pct_per_yr, growth.note, growth.significant),
@@ -247,9 +251,9 @@ def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int) -> Ri
         "avalanche": (terrain.avalanche_area_km2, "slopes > 30° that can reach the lake", True),
         "glacier": (
             gd,
-            f"measured in {current['year']}"
+            f"{glacier.rgi_id} ({glacier.glacier_area_km2} km², outline {glacier.outline_date})"
             if gd is not None
-            else "no glacier ice seen within the lake's area of interest",
+            else "no inventoried glacier within 3 km",
             gd is not None,
         ),
     }
@@ -306,17 +310,23 @@ def run_risk(lake_dir: Path, tp: TerrainParams = TerrainParams()) -> dict:
         if (lake_dir / f"{r['year']}.geojson").exists()
     }
     cache: dict[int, LakeTerrain] = {}
+    gcache: dict[int, GlacierProximity] = {}
 
     def terrain_for(year: int) -> LakeTerrain:
         if year not in cache:
             cache[year] = lake_terrain(outlines[year]["geometry"], tp)
         return cache[year]
 
+    def glacier_for(year: int) -> GlacierProximity:
+        if year not in gcache:
+            gcache[year] = nearest_glacier(shape(outlines[year]["geometry"]))
+        return gcache[year]
+
     usable = [r for r in years if r["year"] in outlines]
     replay = [
         rec
         for y in sorted(r["year"] for r in years)
-        if (rec := score_as_of(series["lake"]["id"], usable, terrain_for, y))
+        if (rec := score_as_of(series["lake"]["id"], usable, terrain_for, y, glacier_for))
     ]
     latest = replay[-1] if replay else None
     out = {
@@ -334,4 +344,6 @@ def run_risk(lake_dir: Path, tp: TerrainParams = TerrainParams()) -> dict:
     (lake_dir / "risk.json").write_text(json.dumps(out, indent=1, ensure_ascii=False))
     if latest:
         (lake_dir / "outlet.geojson").write_text(json.dumps(outlet_geojson(terrain_for(latest.area_year))))
+        latest_outline = shape(outlines[latest.area_year]["geometry"])
+        (lake_dir / "glaciers.geojson").write_text(json.dumps(glaciers_geojson(latest_outline)))
     return out

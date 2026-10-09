@@ -67,7 +67,7 @@ stated linear rule; the UI shows value, rule, score, weight, note and source for
 | Lake growth | likelihood (¼) | Theil–Sen trend over full-coverage seasons, ×5; zero unless the change beats 2× measurement uncertainty | 0 → 25% per 5 yr | CWC 2024 top class |
 | Steepness below outlet | likelihood (¼) | mean gradient of the first 1 km of flow path below the spill point (DEM) | 0 → 10° | Fujita et al. 2013 steep-lakefront 10° |
 | Ice/rock fall sources | likelihood (¼) | area of > 30° slopes in the lake's catchment whose line to the lake is > 14° | 0 → 0.5 km² | Allen et al. 2016 (Himachal) definition, Rinzin et al. 2021 high class |
-| Distance to glacier ice | likelihood (¼) | Sentinel-2 snow/ice in ≥ half of cloud-free looks, patches ≥ 0.05 km² | 500 m → 0 m | Rinzin et al. 2021, CWC 2024 |
+| Distance to glacier ice | likelihood (¼) | nearest Randolph Glacier Inventory 7.0 outline (c. 2000; includes debris-covered tongues) | 500 m → 0 m | Rinzin et al. 2021, CWC 2024 |
 
 Levels: low < 20 ≤ moderate < 40 ≤ high < 60 ≤ very high.
 

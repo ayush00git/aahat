@@ -28,7 +28,9 @@ def parse_years(spec: str) -> list[int]:
 def cmd_series(args) -> None:
     lakes = load_lakes() if args.lake == "all" else [get_lake(args.lake)]
     for lake in lakes:
-        recs = run_lake(lake, parse_years(args.years), Path(args.out), max_scenes=args.max_scenes, quicklook=args.quicklook)
+        recs = run_lake(
+            lake, parse_years(args.years), Path(args.out), max_scenes=args.max_scenes, quicklook=args.quicklook
+        )
         print(f"\n{lake.name} ({lake.id})")
         print(f"{'year':>6} {'status':>10} {'area km2':>10} {'+/-':>8} {'cover':>6} {'scenes':>7}")
         for r in recs:
@@ -47,7 +49,9 @@ def cmd_risk(args) -> None:
         print(f"\n{lake.name}: replay (season: score = 100 x size x likelihood, level)")
         for r in out["replay"]:
             parts = ", ".join(f"{f['key']} {f['score']:.2f}" for f in r["factors"])
-            print(f"  {r['as_of_season']}  {r['score']:5.1f} = {r['size']:.2f} x {r['likelihood']:.2f}  {r['level']:<9}  [{parts}]")
+            print(
+                f"  {r['as_of_season']}  {r['score']:5.1f} = {r['size']:.2f} x {r['likelihood']:.2f}  {r['level']:<9}  [{parts}]"
+            )
     build_index(Path(args.out))
 
 
@@ -90,7 +94,9 @@ def cmd_discover(args) -> None:
         x, y = grid.transform @ (c + 0.5, r + 0.5)
         pt = to_wgs84(Point(x, y), grid.crs)
         elev = float(np.nanmedian(terrain.dem[labels == i]))
-        rows.append({"lat": round(pt.y, 5), "lon": round(pt.x, 5), "area_km2": round(area / 1e6, 4), "elev_m": round(elev)})
+        rows.append(
+            {"lat": round(pt.y, 5), "lon": round(pt.x, 5), "area_km2": round(area / 1e6, 4), "elev_m": round(elev)}
+        )
     rows.sort(key=lambda r: -r["area_km2"])
     print(json.dumps(rows[: args.top], indent=1))
     if args.quicklook:
@@ -133,7 +139,9 @@ def main(argv: list[str] | None = None) -> None:
     d.set_defaults(func=cmd_discover)
 
     args = ap.parse_args(argv)
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(asctime)s %(name)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING, format="%(asctime)s %(name)s %(message)s"
+    )
     args.func(args)
 
 

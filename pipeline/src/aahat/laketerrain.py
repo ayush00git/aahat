@@ -127,7 +127,11 @@ def outlet_geojson(t: LakeTerrain) -> dict:
     return {
         "type": "FeatureCollection",
         "features": [
-            {"type": "Feature", "geometry": mapping(Point(t.outlet_lon, t.outlet_lat)), "properties": {"kind": "outlet"}},
+            {
+                "type": "Feature",
+                "geometry": mapping(Point(t.outlet_lon, t.outlet_lat)),
+                "properties": {"kind": "outlet"},
+            },
             {
                 "type": "Feature",
                 "geometry": {"type": "LineString", "coordinates": t.outlet_path},

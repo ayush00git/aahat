@@ -79,7 +79,8 @@ def test_glacier_rule_scores_contact_highest_and_none_as_zero():
     ys = years({2017: 1.0e6, 2018: 1.02e6, 2019: 1.04e6})
     rec = score_as_of("x", ys, lambda y: terrain(), 2019)
     g = next(f for f in rec.factors if f.key == "glacier")
-    assert g.score == 0 and "no glacier" in g.note
-    ys[-1]["glacier_distance_m"] = 0
-    rec = score_as_of("x", ys, lambda y: terrain(), 2019)
+    assert g.score == 0 and "no inventoried glacier" in g.note
+    from aahat.glaciers import GlacierProximity
+
+    rec = score_as_of("x", ys, lambda y: terrain(), 2019, lambda y: GlacierProximity(0.0, "RGI-x", 1.2, "2002-08-02"))
     assert next(f for f in rec.factors if f.key == "glacier").score == 1

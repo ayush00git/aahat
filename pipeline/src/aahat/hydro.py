@@ -43,7 +43,9 @@ def water_level(dem: np.ndarray, lake: np.ndarray) -> float:
     return float(np.median(z[bins == mode]))
 
 
-def spill_mask(dem: np.ndarray, lake: np.ndarray, res: float, tol_m: float = 1.5, max_slope_deg: float = 2.0) -> np.ndarray:
+def spill_mask(
+    dem: np.ndarray, lake: np.ndarray, res: float, tol_m: float = 1.5, max_slope_deg: float = 2.0
+) -> np.ndarray:
     """Grow a lake mask over the DEM's flat water surface that touches it.
 
     DEMs flatten lakes, and an outline from a newer image need not line up with that surface.
