@@ -70,8 +70,25 @@ function eventMode(ev: AlertEvent): Mode {
 }
 
 function ModeTag({ mode }: { mode: Mode }) {
-  if (mode === "dry") return <span class="tag dry">DRY RUN</span>;
-  if (mode === "live") return <span class="tag live">LIVE ALERT</span>;
+  if (mode === "dry")
+    return (
+      <span class="tag dry">
+        <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+          <path d="M6 1.5h4M6.8 1.5v4.2L2.6 13a1 1 0 0 0 .9 1.5h9a1 1 0 0 0 .9-1.5L9.2 5.7V1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+        </svg>
+        DRY RUN
+      </span>
+    );
+  if (mode === "live")
+    return (
+      <span class="tag live">
+        <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+          <circle cx="8" cy="8" r="2" fill="currentColor" />
+          <path d="M4.5 4.5a5 5 0 0 0 0 7M11.5 4.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        LIVE ALERT
+      </span>
+    );
   return null;
 }
 
@@ -86,6 +103,16 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
       {requestedDry && mode === "live" && (
         <p class="flag danger" role="alert">
           A dry run was requested but this server sent the messages: it does not support dry runs yet.
+        </p>
+      )}
+      {mode === "dry" && (
+        <p class="plan-banner dry">
+          <b>Dry run.</b> Nothing was sent: {dryCount} planned message{dryCount === 1 ? "" : "s"} logged as "dry run".
+        </p>
+      )}
+      {mode === "live" && (
+        <p class="plan-banner live">
+          <b>Live alert.</b> {ev.summary.sent} sent{ev.summary.failed ? `, ${ev.summary.failed} failed` : ""} to real phones.
         </p>
       )}
       <div class="plan-head">
@@ -371,13 +398,20 @@ export function AlertsTab({ lake, downstream }: { lake: Lake; downstream: Downst
           </label>
           <label class={`check${dryRun ? "" : " live"}`}>
             <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.currentTarget.checked)} />
-            <span>
-              <b>Dry run</b> — don't send to real phones
+            <span class="check-text">
+              <span>
+                <b>Dry run</b> — don't send to real phones
+              </span>
+              <span class="check-sub">
+                {dryRun
+                  ? "The plan, messages and audio are built and logged; nothing is sent."
+                  : "Unchecked: this run will message real subscribers."}
+              </span>
             </span>
           </label>
           {!dryRun && (
             <p class="flag danger">
-              <span class="tag live">LIVE ALERT</span> Messages will go to real subscribers' phones.
+              <ModeTag mode="live" /> Messages will go to real subscribers' phones.
             </p>
           )}
           <button type="button" class={dryRun ? "btn-primary btn-lg" : "btn-danger"} disabled={busy} onClick={() => setConfirm(true)}>
@@ -434,7 +468,7 @@ export function AlertsTab({ lake, downstream }: { lake: Lake; downstream: Downst
             onClick={(e) => e.stopPropagation()}
           >
             <div class={`modal-mode ${dryRun ? "dry" : "live"}`}>
-              {dryRun ? <span class="tag dry">DRY RUN</span> : <span class="tag live">LIVE ALERT</span>}
+              <ModeTag mode={dryRun ? "dry" : "live"} />
               <span class="tag sim">SIMULATION</span>
               {!dryRun && <span class="small">Step {step} of 2</span>}
             </div>

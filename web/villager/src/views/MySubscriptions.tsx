@@ -12,7 +12,7 @@ export function MySubscriptions({ osm }: { osm: string }) {
 
   if (subs.length === 0 && !message) return null;
   return (
-    <section class="card card-info stack-sm" aria-live="polite">
+    <section class="note note-info stack-sm" aria-live="polite">
       {subs.length > 0 && <p class="card-title-sm">{t.subscribedHere}</p>}
       {subs.map((s) => (
         <SubRow

@@ -16,6 +16,11 @@ export interface Place {
   name_hi: string | null;
   lon: number;
   lat: number;
+  /**
+   * True when at least one monitored lake's analysis includes the place.
+   * Newer API only: a missing field means "not known", so no badge is shown.
+   */
+  covered?: boolean;
 }
 
 export interface Pair<T> {
@@ -161,6 +166,44 @@ export async function pushPublicKey(): Promise<string | null> {
     return key || null;
   } catch {
     return null;
+  }
+}
+
+/** A watched lake, as much of GET /lakes as the "not covered" screen shows. */
+export interface LakeSummary {
+  id: string;
+  name: string;
+  name_hi: string;
+  district: string;
+  risk_level: RiskLevel | null;
+}
+
+interface LakeIndex {
+  lakes: {
+    id: string;
+    name: string;
+    name_hi: string;
+    district: string;
+    risk: { level: RiskLevel; score: number | null } | null;
+  }[];
+}
+
+/**
+ * getLakes lists the monitored lakes, highest risk first (the API's own
+ * score order). The answer is kept in localStorage so it shows offline too.
+ */
+export async function getLakes(): Promise<LakeSummary[]> {
+  try {
+    const idx = await request<LakeIndex>('/lakes');
+    const lakes = [...idx.lakes]
+      .sort((a, b) => (b.risk?.score ?? -1) - (a.risk?.score ?? -1))
+      .map((l) => ({ id: l.id, name: l.name, name_hi: l.name_hi, district: l.district, risk_level: l.risk?.level ?? null }));
+    save('lakes', lakes);
+    return lakes;
+  } catch (err) {
+    const saved = load<LakeSummary[]>('lakes');
+    if (saved) return saved;
+    throw err;
   }
 }
 

@@ -3,7 +3,7 @@
 
 import type { ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
-import { LEVEL_COLOR, COLORS } from "../colors";
+import { LEVEL_COLOR, CHART } from "../colors";
 import { dateOnly, km2, LEVEL_LABEL, num, YEAR_STATUS_LABEL } from "../format";
 import type { RiskLevel, RiskRecord, YearRecord } from "../types";
 
@@ -97,7 +97,7 @@ export function ReplayChart({ replay, levels }: { replay: RiskRecord[]; levels: 
       >
         {bands.map((b) => (
           <g key={b.lv}>
-            <rect x={pad.l} y={sy(b.hi)} width={W - pad.l - pad.r} height={sy(b.lo) - sy(b.hi)} fill={LEVEL_COLOR[b.lv]} opacity={0.07} />
+            <rect x={pad.l} y={sy(b.hi)} width={W - pad.l - pad.r} height={sy(b.lo) - sy(b.hi)} fill={LEVEL_COLOR[b.lv]} opacity={0.1} />
             {b.lo > 0 && <line x1={pad.l} x2={W - pad.r} y1={sy(b.lo)} y2={sy(b.lo)} class="grid" />}
             <text x={W - pad.r + 6} y={(sy(b.lo) + sy(b.hi)) / 2 + 3} class="axis-label">
               {LEVEL_LABEL[b.lv]}
@@ -116,7 +116,7 @@ export function ReplayChart({ replay, levels }: { replay: RiskRecord[]; levels: 
         ))}
         <line x1={pad.l} x2={W - pad.r} y1={H - pad.b} y2={H - pad.b} class="axis" />
         {h && <line x1={xs[hov.idx!]} x2={xs[hov.idx!]} y1={pad.t} y2={H - pad.b} class="crosshair" />}
-        <path d={path} fill="none" stroke={COLORS.ink} stroke-width={2} stroke-linejoin="round" />
+        <path d={path} fill="none" stroke={CHART.line} stroke-width={2} stroke-linejoin="round" opacity={0.9} />
         {pts.map((p, i) => (
           <circle
             key={p.as_of_season}
@@ -217,13 +217,13 @@ export function GrowthChart({ years }: { years: YearRecord[] }) {
           </text>
         ))}
         {h && <line x1={xs[hov.idx!]} x2={xs[hov.idx!]} y1={pad.t} y2={H - pad.b} class="crosshair" />}
-        <path d={fullPath} fill="none" stroke={COLORS.accent} stroke-width={2} stroke-linejoin="round" opacity={0.85} />
+        <path d={fullPath} fill="none" stroke={CHART.accent} stroke-width={2} stroke-linejoin="round" opacity={0.85} />
         {ys.map((y, i) => {
           if (y.area_m2 === null) {
             return (
               <g key={y.year}>
-                <line x1={xs[i] - 3} x2={xs[i] + 3} y1={H - pad.b - 9} y2={H - pad.b - 3} stroke={COLORS.muted} stroke-width={1.5} />
-                <line x1={xs[i] + 3} x2={xs[i] - 3} y1={H - pad.b - 9} y2={H - pad.b - 3} stroke={COLORS.muted} stroke-width={1.5} />
+                <line x1={xs[i] - 3} x2={xs[i] + 3} y1={H - pad.b - 9} y2={H - pad.b - 3} stroke={CHART.muted} stroke-width={1.5} />
+                <line x1={xs[i] + 3} x2={xs[i] - 3} y1={H - pad.b - 9} y2={H - pad.b - 3} stroke={CHART.muted} stroke-width={1.5} />
               </g>
             );
           }
@@ -232,15 +232,15 @@ export function GrowthChart({ years }: { years: YearRecord[] }) {
           const partial = y.status !== "ok";
           return (
             <g key={y.year}>
-              <line x1={xs[i]} x2={xs[i]} y1={sy(a - u)} y2={sy(a + u)} stroke={COLORS.ink} stroke-width={1.2} opacity={0.6} />
-              <line x1={xs[i] - 4} x2={xs[i] + 4} y1={sy(a - u)} y2={sy(a - u)} stroke={COLORS.ink} stroke-width={1.2} opacity={0.6} />
-              <line x1={xs[i] - 4} x2={xs[i] + 4} y1={sy(a + u)} y2={sy(a + u)} stroke={COLORS.ink} stroke-width={1.2} opacity={0.6} />
+              <line x1={xs[i]} x2={xs[i]} y1={sy(a - u)} y2={sy(a + u)} stroke={CHART.whisker} stroke-width={1.2} opacity={0.7} />
+              <line x1={xs[i] - 4} x2={xs[i] + 4} y1={sy(a - u)} y2={sy(a - u)} stroke={CHART.whisker} stroke-width={1.2} opacity={0.7} />
+              <line x1={xs[i] - 4} x2={xs[i] + 4} y1={sy(a + u)} y2={sy(a + u)} stroke={CHART.whisker} stroke-width={1.2} opacity={0.7} />
               <circle
                 cx={xs[i]}
                 cy={sy(a)}
                 r={hov.idx === i ? 5.5 : 4.5}
-                fill={partial ? "var(--surface)" : COLORS.accent}
-                stroke={COLORS.accent}
+                fill={partial ? "var(--surface)" : CHART.accent}
+                stroke={CHART.accent}
                 stroke-width={2}
               />
             </g>

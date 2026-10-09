@@ -1,3 +1,4 @@
+import { LEVEL_COLOR } from "../colors";
 import { km2, num } from "../format";
 import type { Lake } from "../types";
 import { Sparkline } from "./charts";
@@ -22,11 +23,12 @@ export function LakeList({
     <nav class="sidebar" aria-label="Lakes ranked by risk">
       <div class="sidebar-head">
         <h2>Watched lakes</h2>
-        <span class="muted">{lakes.length} · by risk score</span>
+        <span class="muted small">{lakes.length} · ranked by risk score</span>
       </div>
       <ol class="lake-list">
         {ranked.map((l, i) => {
           const latest = l.latest;
+          const score = l.risk?.score ?? null;
           return (
             <li key={l.id}>
               <button
@@ -37,32 +39,37 @@ export function LakeList({
               >
                 <span class="lake-rank">{i + 1}</span>
                 <span class="lake-main">
-                  <span class="lake-name">
-                    {l.name}{" "}
-                    <span class="hi" lang="hi">
-                      {l.name_hi}
-                    </span>
+                  <span class="lake-name">{l.name}</span>
+                  <span class="lake-hi hi" lang="hi">
+                    {l.name_hi}
                   </span>
                   <span class="lake-meta">
                     {l.district} · {l.kind}
                   </span>
+                </span>
+                <span class="lake-risk">
+                  <span class="lake-score">{num(score, 1)}</span>
+                  <LevelBadge level={l.risk?.level} compact />
+                </span>
+                <span class="lake-foot">
+                  <Sparkline years={l.years} />
                   <span class="lake-area">
                     {latest ? km2(latest.area_m2) : "—"}
                     {latest && <span class="muted"> in {latest.year}</span>}
                   </span>
                 </span>
-                <span class="lake-risk">
-                  <span class="lake-score">{num(l.risk?.score, 1)}</span>
-                  <LevelBadge level={l.risk?.level} compact />
-                  <Sparkline years={l.years} />
-                </span>
+                {score !== null && l.risk && (
+                  <span class="lake-meter" aria-hidden="true">
+                    <span style={{ width: `${Math.max(0, Math.min(100, score))}%`, background: LEVEL_COLOR[l.risk.level] }} />
+                  </span>
+                )}
               </button>
             </li>
           );
         })}
       </ol>
       <div class="sidebar-legend muted">
-        Sparkline: area by year. Hollow points are partial-coverage years.
+        Sparkline: lake area by year; hollow points are partial-coverage years. Bar: risk score out of 100.
       </div>
     </nav>
   );

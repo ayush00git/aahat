@@ -36,13 +36,13 @@ Production is served under **`/officials/`**: Caddy strips the prefix and serves
 
 The MapLibre worker ships as `assets/maplibre-gl-worker-*.mjs`, so the server must send `.mjs` as `text/javascript` (Caddy does). Navigation uses only the URL hash, so no server-side SPA fallback is needed.
 
-Bundle (gzip): app JS about 23 kB, MapLibre about 288 kB (its own chunk, cached separately), CSS about 15 kB. The map worker is 508 kB uncompressed.
+Bundle (gzip): app JS about 26 kB, MapLibre about 288 kB (its own chunk, cached separately), CSS about 17 kB (including MapLibre's). Fonts (IBM Plex Sans, Plex Sans Devanagari, Plex Mono) load from Google Fonts with a system fallback. The map worker is 508 kB uncompressed.
 
 ## What's on screen
 
-- **Header**: newest `risk.data_until` across all lakes, and the disclaimer.
+- **Header**: KPI tiles computed only from `GET /lakes`: lakes monitored, count of very high / high lakes, settlements, bridges and hydro in the flood path (sums of `downstream.exposed_counts`, with the at-risk counts below), and the newest `risk.data_until`. The disclaimer is in the footer.
 - **Sidebar**: lakes ranked by `risk.score`, with the risk level, latest area and an area sparkline. Hollow points are partial-coverage years.
-- **Map**: OSM basemap (desaturated) or Esri World Imagery. The time-lapse shows the selected year's outline over faint outlines of earlier years; partial years are dashed and years without an outline are struck through on the slider. Also shown: RGI 7.0 glaciers, the outlet and spill path, the flood path, the expected and severe corridors, and exposed assets coloured by status (click one for details).
+- **Map**: Esri World Imagery by default, or the OSM map (desaturated). The time-lapse player (previous / play / next, a year slider with one dot per year) shows the selected year's outline over faint outlines of earlier years; partial years are dashed and years without an outline are struck through on the slider. Also shown: RGI 7.0 glaciers, the outlet and spill path, the flood path, the expected and severe corridors, and exposed assets coloured by status (click one for details).
 - **Risk tab**: the score written out as `score = 100 × size × likelihood`, then every factor with its value, rule, 0–1 score bar, weight, note, why it matters and source links. Below that, the replay of the score by season (each season scored only with the data available then) and the method.
 - **Growth tab**: area by year with ± uncertainty whiskers, partial and no-data years flagged, the trend factor, and a table of the yearly measurements.
 - **Downstream exposure tab**: the expected and severe peak discharge, with the empirical relation and source for each; exposed-asset counts; the first asset and first settlement reached; and OpenStreetMap gaps, if any. Then a nearest-first table with kind filters (click a row to fly to it on the map), followed by the caveats.

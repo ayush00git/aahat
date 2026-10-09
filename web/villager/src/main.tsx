@@ -66,7 +66,7 @@ function App() {
           {ctx.t.offline}
         </p>
       )}
-      <main id="main" class="main">
+      <main id="main" class={route.name === 'home' ? 'main main-home' : 'main'}>
         {route.name === 'home' && <Home />}
         {route.name === 'place' && <PlaceView osm={route.osm} />}
         {route.name === 'subscribe' && <Subscribe osm={route.osm} />}

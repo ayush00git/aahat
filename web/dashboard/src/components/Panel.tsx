@@ -45,36 +45,52 @@ export function Panel({
     <aside class="panel" aria-label={`${lake.name} details`}>
       <header class="panel-head">
         <div class="panel-title">
-          <h2>
-            {lake.name}{" "}
-            <span class="hi" lang="hi">
-              {lake.name_hi}
-            </span>
-          </h2>
-          <button type="button" class="icon-btn" onClick={onClose} aria-label="Close lake details" title="Close">
-            ×
+          <div class="panel-title-text">
+            <p class="panel-where">
+              {lake.district} · {lake.basin} · {lake.kind}
+            </p>
+            <h2>
+              {lake.name}{" "}
+              <span class="hi" lang="hi">
+                {lake.name_hi}
+              </span>
+            </h2>
+          </div>
+          <button type="button" class="icon-btn close-btn" onClick={onClose} aria-label="Close lake details" title="Close">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path d="M3.5 3.5l9 9m0-9-9 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
           </button>
         </div>
-        <div class="panel-meta">
-          <LevelBadge level={lake.risk?.level} />
-          <span>
-            score <b>{num(lake.risk?.score, 1)}</b>
-          </span>
-          <span>{lake.district}</span>
-          <span>{lake.basin}</span>
-          <span>{lake.kind}</span>
-        </div>
-        <div class="panel-meta muted small">
-          <span>
-            {km2(lake.latest?.area_m2)} in {lake.latest?.year ?? "—"}
-          </span>
-          {settlements && (
-            <span>
-              settlements: {settlements.in_flood_path} in flood path, {settlements.at_risk} at risk
-            </span>
-          )}
-          <span>data until {dateOnly(lake.risk?.data_until)}</span>
-        </div>
+        <dl class="panel-stats">
+          <div>
+            <dt>Risk score</dt>
+            <dd class="panel-score">
+              <span class="mono">{num(lake.risk?.score, 1)}</span>
+              <LevelBadge level={lake.risk?.level} />
+            </dd>
+          </div>
+          <div>
+            <dt>Area ({lake.latest?.year ?? "—"})</dt>
+            <dd>{km2(lake.latest?.area_m2)}</dd>
+          </div>
+          <div>
+            <dt>Settlements</dt>
+            <dd>
+              {settlements ? (
+                <>
+                  {settlements.in_flood_path} in path <span class="muted">· {settlements.at_risk} at risk</span>
+                </>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Data until</dt>
+            <dd>{dateOnly(lake.risk?.data_until)}</dd>
+          </div>
+        </dl>
       </header>
       <div class="tabs" role="tablist">
         {TABS.map((t) => (
@@ -88,6 +104,11 @@ export function Panel({
             class={`tab${tab === t.id ? " on" : ""}${t.id === "alerts" ? " tab-alert" : ""}`}
             onClick={() => onTab(t.id)}
           >
+            {t.id === "alerts" && (
+              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                <path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.3H3L4 11ZM6.8 14h2.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" />
+              </svg>
+            )}
             {t.label}
           </button>
         ))}

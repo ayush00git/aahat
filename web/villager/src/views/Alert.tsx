@@ -5,6 +5,7 @@ import { num, time, wholeMinutes } from '../format';
 import { href } from '../router';
 import { ACTIONS } from '../content/safety';
 import { EmergencyNumbers } from './Actions';
+import { IconPause, IconPlay, IconUphill } from './icons';
 
 /** The push payload, as the service worker hands it over. */
 export interface AlertPayload {
@@ -78,7 +79,8 @@ export function Alert({ params }: { params: URLSearchParams }) {
   return (
     <div class="alert" role="alertdialog" aria-labelledby="alert-h" aria-describedby="alert-body">
       <p class="alert-kicker">
-        <span aria-hidden="true">⚠</span> {t.alertHeading}
+        <span class="alert-beacon" aria-hidden="true" />
+        {t.alertHeading}
       </p>
       <h1 id="alert-h" class="alert-title" tabIndex={-1} ref={heading} lang={msgLang}>
         {title}
@@ -88,12 +90,16 @@ export function Alert({ params }: { params: URLSearchParams }) {
         <div class="alert-count" aria-live="assertive">
           <p class="alert-count-label">{t.alertArrival}</p>
           <p class="alert-count-num">
-            ~{num(wholeMinutes(minutes), lang, 0)} <span class="alert-count-unit">{t.minutes}</span>
+            <span class="arrival-tilde">~</span>
+            {num(wholeMinutes(minutes), lang, 0)} <span class="alert-count-unit">{t.minutes}</span>
           </p>
         </div>
       )}
 
-      <p class="alert-go">{t.alertGo}</p>
+      <p class="alert-go">
+        <IconUphill size={40} />
+        <span>{t.alertGo}</span>
+      </p>
 
       {body && (
         <p id="alert-body" class="alert-body" lang={msgLang}>
@@ -112,8 +118,11 @@ export function Alert({ params }: { params: URLSearchParams }) {
             onEnded={() => setPlaying(false)}
             onError={() => setAudioError(true)}
           />
-          <button type="button" class="btn btn-alert" onClick={toggle} aria-pressed={playing}>
-            <span aria-hidden="true">{playing ? '❚❚' : '▶'}</span> {playing ? t.alertPause : t.alertPlay}
+          <button type="button" class="audio-btn" onClick={toggle} aria-pressed={playing}>
+            <span class="audio-btn-icon" aria-hidden="true">
+              {playing ? <IconPause size={34} /> : <IconPlay size={34} />}
+            </span>
+            <span class="audio-btn-label">{playing ? t.alertPause : t.alertPlay}</span>
           </button>
           {audioError && <p class="alert-small">{t.alertAudioError}</p>}
         </div>

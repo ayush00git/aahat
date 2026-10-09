@@ -1,3 +1,4 @@
+import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { ApiError, createSubscription, pushPublicKey, type Channel, type SubscribeRequest, type Threats } from '../api';
 import { useI18n } from '../i18n';
@@ -8,6 +9,7 @@ import { PushDeniedError, pushSupported, subscribePush } from '../push';
 import { usePlace } from '../usePlace';
 import { BackLink, PlaceStatus } from './Place';
 import { SubRow } from './MySubscriptions';
+import { IconBell, IconCheck, IconPhone, IconSms } from './icons';
 
 // The API cannot place voice calls to India yet; the option is shown as
 // "coming soon" so people know it is planned. Flip this when it works.
@@ -93,13 +95,13 @@ function SubscribeForm({ osm, place }: { osm: string; place: Threats }) {
     return (
       <div class="stack">
         <BackLink to={href.place(osm)} />
-        <section class="card card-safe stack-sm" aria-live="polite">
-          <h1 class="card-title">
-            <span class="status-icon" aria-hidden="true">
-              ✓
+        <section class="status status-safe" aria-live="polite">
+          <div class="status-head">
+            <span class="status-badge" aria-hidden="true">
+              <IconCheck size={30} />
             </span>
-            {stopped ? t.unsubscribed : t.success}
-          </h1>
+            <h1 class="status-title">{stopped ? t.unsubscribed : t.success}</h1>
+          </div>
           {!stopped && (
             <>
               <p>{t.successBody(shown)}</p>
@@ -114,24 +116,52 @@ function SubscribeForm({ osm, place }: { osm: string; place: Threats }) {
     );
   }
 
-  const channels: { id: Channel; label: string; help?: string; disabled?: boolean }[] = [
-    { id: 'sms', label: t.channel_sms },
-    { id: 'voice', label: t.channel_voice, help: VOICE_AVAILABLE ? undefined : t.channelSoon, disabled: !VOICE_AVAILABLE },
+  const channels: { id: Channel; label: string; help: string; icon: JSX.Element; disabled?: boolean }[] = [
+    { id: 'sms', label: t.channel_sms, help: t.channelSmsHelp, icon: <IconSms size={26} /> },
+    {
+      id: 'voice',
+      label: t.channel_voice,
+      help: t.channelVoiceHelp,
+      icon: <IconPhone size={26} />,
+      disabled: !VOICE_AVAILABLE,
+    },
   ];
-  if (pushKey) channels.push({ id: 'webpush', label: t.channel_webpush, help: t.channelPushHelp });
+  if (pushKey) channels.push({ id: 'webpush', label: t.channel_webpush, help: t.channelPushHelp, icon: <IconBell size={26} /> });
+
+  // The steps are numbered as shown: app notifications need no phone number.
+  const total = needsPhone ? 3 : 2;
+  const confirmStep = needsPhone ? 3 : 2;
 
   return (
     <div class="stack">
       <BackLink to={href.place(osm)} />
-      <h1 class="page-title">{t.subscribeCta}</h1>
-      <p>{t.subscribeIntro(shown)}</p>
+      <div class="stack-sm">
+        <h1 class="page-title">{t.subscribeCta}</h1>
+        <p class="lead">{t.subscribeIntro(shown)}</p>
+      </div>
 
-      <form class="stack" onSubmit={submit} noValidate>
-        <fieldset class="fieldset">
-          <legend class="field-label">{t.channelLabel}</legend>
+      <form class="steps" onSubmit={submit} noValidate>
+        <fieldset class="step">
+          <legend class="step-head">
+            <span class="step-num" aria-hidden="true">
+              1
+            </span>
+            <span class="step-title">{t.channelLabel}</span>
+            <span class="sr-only">{t.stepOf(1, total)}</span>
+          </legend>
           <div class="choices">
             {channels.map((c) => (
               <label key={c.id} class={`choice${c.disabled ? ' choice-disabled' : ''}`}>
+                <span class="choice-icon" aria-hidden="true">
+                  {c.icon}
+                </span>
+                <span class="choice-text">
+                  <span class="choice-label">
+                    {c.label}
+                    {c.disabled && <span class="pill pill-soon">{t.channelSoon}</span>}
+                  </span>
+                  <span class="choice-help">{c.help}</span>
+                </span>
                 <input
                   type="radio"
                   name="channel"
@@ -140,20 +170,21 @@ function SubscribeForm({ osm, place }: { osm: string; place: Threats }) {
                   disabled={c.disabled}
                   onChange={() => setChannel(c.id)}
                 />
-                <span>
-                  <span class="choice-label">{c.label}</span>
-                  {c.help && <span class="choice-help">{c.help}</span>}
-                </span>
               </label>
             ))}
           </div>
         </fieldset>
 
         {needsPhone && (
-          <div class="field">
-            <label for="phone" class="field-label">
-              {t.phoneLabel}
-            </label>
+          <div class="step">
+            <p class="step-head">
+              <span class="step-num" aria-hidden="true">
+                2
+              </span>
+              <label for="phone" class="step-title">
+                {t.phoneLabel}
+              </label>
+            </p>
             <input
               id="phone"
               class="text-input mono"
@@ -171,19 +202,27 @@ function SubscribeForm({ osm, place }: { osm: string; place: Threats }) {
           </div>
         )}
 
-        <p class="small muted">
-          {t.messageLang} {needsPhone && t.consent}
-        </p>
-
-        {error && (
-          <p class="error card card-neutral" role="alert">
-            {error}
+        <div class="step">
+          <p class="step-head">
+            <span class="step-num" aria-hidden="true">
+              {confirmStep}
+            </span>
+            <span class="step-title">{t.confirmLabel}</span>
           </p>
-        )}
+          <p class="small muted">
+            {t.messageLang} {needsPhone && t.consent}
+          </p>
 
-        <button type="submit" class="btn btn-primary" disabled={busy}>
-          {busy ? t.submitting : t.submit}
-        </button>
+          {error && (
+            <p class="error note note-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" class="btn btn-primary btn-big" disabled={busy}>
+            {busy ? t.submitting : t.submit}
+          </button>
+        </div>
       </form>
     </div>
   );

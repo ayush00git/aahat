@@ -146,14 +146,10 @@ export function App() {
     if (import.meta.env.DEV) (window as unknown as { __aahatMap: MapController }).__aahatMap = c;
   }, []);
 
-  const dataUntil = lakes.reduce<string | null>(
-    (m, l) => (l.risk?.data_until && (!m || l.risk.data_until > m) ? l.risk.data_until : m),
-    null,
-  );
 
   return (
     <div class={`app${lake ? " has-panel" : ""}`}>
-      <Header dataUntil={dataUntil} generatedAt={index?.generated_at ?? null} />
+      <Header lakes={index?.lakes ?? null} generatedAt={index?.generated_at ?? null} />
       {indexErr ? (
         <div class="sidebar">
           <ErrorMsg msg={`Could not load the lake index. ${indexErr}`} />

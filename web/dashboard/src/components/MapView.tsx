@@ -36,7 +36,7 @@ export function MapView({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const ctrl = useRef<MapController | null>(null);
-  const [basemap, setBasemap] = useState<Basemap>("map");
+  const [basemap, setBasemap] = useState<Basemap>("satellite");
   const [visible, setVisible] = useState<Record<LayerGroup, boolean>>({
     outlines: true,
     glaciers: true,
@@ -113,6 +113,13 @@ export function MapView({
     return () => clearInterval(t);
   }, [playing, years]);
 
+  const step = (d: -1 | 1) => {
+    setPlaying(false);
+    const i = years.findIndex((y) => y.year === year);
+    const next = years[Math.max(0, Math.min(years.length - 1, (i < 0 ? years.length - 1 : i) + d))];
+    if (next) setYear(next.year);
+  };
+
   const togglePlay = () => {
     if (!years.length) return;
     if (!playing && year === years[years.length - 1].year) setYear(years[0].year);
@@ -138,11 +145,11 @@ export function MapView({
 
       <div class="map-overlay map-controls">
         <div class="seg" role="group" aria-label="Basemap">
-          <button type="button" class={!sat ? "on" : ""} onClick={() => changeBasemap("map")}>
-            Map
-          </button>
-          <button type="button" class={sat ? "on" : ""} onClick={() => changeBasemap("satellite")}>
+          <button type="button" class={sat ? "on" : ""} aria-pressed={sat} onClick={() => changeBasemap("satellite")}>
             Satellite
+          </button>
+          <button type="button" class={!sat ? "on" : ""} aria-pressed={!sat} onClick={() => changeBasemap("map")}>
+            Map
           </button>
         </div>
         <div class="seg" role="group" aria-label="Zoom to">
@@ -156,13 +163,20 @@ export function MapView({
             All lakes
           </button>
         </div>
-        {loading && <span class="map-loading">Loading layers…</span>}
+        {loading && (
+          <span class="map-loading" role="status">
+            <span class="spinner" aria-hidden="true" /> Loading layers…
+          </span>
+        )}
       </div>
 
       {lake && (
         <div class={`map-overlay map-legend${legendOpen ? "" : " closed"}`} aria-label="Map layers">
           <button type="button" class="lg-toggle" onClick={() => setLegendOpen(!legendOpen)} aria-expanded={legendOpen}>
-            Layers <span aria-hidden="true">{legendOpen ? "▴" : "▾"}</span>
+            <span>Layers</span>
+            <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" class={legendOpen ? "chev up" : "chev"}>
+              <path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.6" />
+            </svg>
           </button>
           {legendOpen && (
             <>
@@ -182,9 +196,9 @@ export function MapView({
                 <input type="checkbox" checked={visible.flood} onChange={(e) => setGroup("flood", e.currentTarget.checked)} />
                 <span class="sw sw-line" style={{ borderColor: sat ? COLORS.floodPathSat : COLORS.floodPath }} />
                 Flood path
-                <span class="sw" style={{ background: COLORS.corridorExpected, opacity: 0.6 }} />
+                <span class="sw" style={{ background: COLORS.corridorExpected, opacity: 0.75 }} />
                 expected
-                <span class="sw" style={{ background: COLORS.corridorSevere, opacity: 0.6 }} />
+                <span class="sw" style={{ background: COLORS.corridorSevere, opacity: 0.75 }} />
                 severe
               </label>
               <label class="lg-row">
@@ -203,25 +217,37 @@ export function MapView({
       )}
 
       {lake && years.length > 0 && (
-        <div class="map-overlay timelapse" aria-label="Lake outline time-lapse">
-          <button
-            type="button"
-            class="play"
-            onClick={togglePlay}
-            aria-label={playing ? "Pause time-lapse" : "Play time-lapse"}
-            title={playing ? "Pause" : "Play"}
-          >
-            {playing ? (
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                <rect x="3" y="2" width="3.5" height="12" fill="currentColor" />
-                <rect x="9.5" y="2" width="3.5" height="12" fill="currentColor" />
+        <div class="map-overlay timelapse" role="group" aria-label="Lake outline time-lapse">
+          <div class="tl-buttons">
+            <button type="button" class="tl-step" onClick={() => step(-1)} disabled={year === minYear} aria-label="Previous year" title="Previous year">
+              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                <path d="M3 2v12M13 2 5.5 8 13 14Z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
               </svg>
-            ) : (
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                <path d="M4 2 L14 8 L4 14 Z" fill="currentColor" />
+            </button>
+            <button
+              type="button"
+              class="play"
+              onClick={togglePlay}
+              aria-label={playing ? "Pause time-lapse" : "Play time-lapse"}
+              title={playing ? "Pause" : "Play"}
+            >
+              {playing ? (
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                  <rect x="3" y="2" width="3.5" height="12" rx="1" fill="currentColor" />
+                  <rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="currentColor" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                  <path d="M4.5 2.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8a.8.8 0 0 0-1.2.7Z" fill="currentColor" />
+                </svg>
+              )}
+            </button>
+            <button type="button" class="tl-step" onClick={() => step(1)} disabled={year === maxYear} aria-label="Next year" title="Next year">
+              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                <path d="M13 2v12M3 2l7.5 6L3 14Z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
               </svg>
-            )}
-          </button>
+            </button>
+          </div>
           <div class="tl-track">
             <input
               type="range"
@@ -229,6 +255,7 @@ export function MapView({
               max={maxYear}
               step={1}
               value={year ?? maxYear}
+              style={{ "--p": `${maxYear > minYear ? (((year ?? maxYear) - minYear) / (maxYear - minYear)) * 100 : 100}%` }}
               onInput={(e) => {
                 setPlaying(false);
                 setYear(Number(e.currentTarget.value));
@@ -237,13 +264,16 @@ export function MapView({
               aria-valuetext={String(year)}
             />
             <div class="tl-ticks" aria-hidden="true">
-              {years.map((y) => (
+              {years.map((y, i) => (
                 <span
                   key={y.year}
-                  class={`tl-tick ${y.status}${y.year === year ? " cur" : ""}${withOutline.has(y.year) ? "" : " none"}`}
+                  class={`tl-tick ${y.status}${y.year === year ? " cur" : ""}${withOutline.has(y.year) ? "" : " none"}${
+                    i === 0 || i === years.length - 1 ? " edge" : ""
+                  }`}
                   title={`${y.year}: ${YEAR_STATUS_LABEL[y.status] ?? y.status}`}
                 >
-                  {String(y.year).slice(2)}
+                  <span class="tl-tick-dot" />
+                  <span class="tl-tick-label">{y.year}</span>
                 </span>
               ))}
             </div>

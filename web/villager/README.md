@@ -56,8 +56,8 @@ See `.env.example`.
 
 | Route                  | Screen |
 |------------------------|--------|
-| `#/`                   | Home: village search (debounced), last-viewed village, install button |
-| `#/p/node/123`         | Village result: safe, unknown, or one card per threatening lake (nearest first); amber cards for floods passing nearby (`nearby`); "क्या करें" |
+| `#/`                   | Home: name and tagline over an inline-SVG Himalayan scene, village search (debounced; a "निगरानी में" badge when a result has `covered: true`, nothing when the field is missing), last-viewed village, install button |
+| `#/p/node/123`         | Village result: safe, not covered (`known: false`: says so in Hindi and English and lists the monitored lakes from `GET /lakes`), or one card per threatening lake (nearest first); amber cards for floods passing nearby (`nearby`); "क्या करें" |
 | `#/p/node/123/subscribe` | Sign up: SMS, phone call (shown as "coming soon"), or app notification (web push, shown only if the browser supports it and `GET /push/public-key` answers) |
 | `#/p/node/123/map`     | Map (lazy): village, latest lake outline, flood path, expected/severe corridors |
 | `#/alert?…`            | Full-screen red alert, opened from a push notification |
@@ -69,6 +69,8 @@ See `.env.example`.
 - `src/api.ts`: API client and response types. Saves the last threats answer per village in localStorage so the page opens offline.
 - `src/push.ts`: service worker registration, Web Push subscribe and unsubscribe.
 - `sw/sw.js`: service worker template. At build time `vite.config.ts` writes `dist/sw.js` with the app-shell precache list. It handles offline fallback, `push` (shows the notification) and `notificationclick` (opens `#/alert`).
+- `src/fonts/`: Eczar 700 (SIL OFL, see `OFL.txt`), subset to Devanagari and basic Latin: the display face for the name, headings and big numbers. Two files, about 58 KB together, `font-display: swap`; body text uses the phone's own fonts.
+- `src/views/icons.tsx`: inline SVG icons.
 - `src/map/initMap.ts`: everything MapLibre. It is the only module that imports it, so the map stays out of the first-load bundle.
 
 ## Push payload

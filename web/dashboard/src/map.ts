@@ -48,13 +48,21 @@ const STYLE: StyleSpecification = {
     },
   },
   layers: [
+    // Satellite imagery by default; the OSM map is one click away.
     {
       id: "basemap-osm",
       type: "raster",
       source: "osm",
+      layout: { visibility: "none" },
       paint: { "raster-saturation": -0.55, "raster-contrast": -0.05 },
     },
-    { id: "basemap-esri", type: "raster", source: "esri", layout: { visibility: "none" } },
+    {
+      id: "basemap-esri",
+      type: "raster",
+      source: "esri",
+      // Slightly muted so the flood layers read clearly over the imagery.
+      paint: { "raster-saturation": -0.2, "raster-brightness-max": 0.9 },
+    },
   ],
 };
 
@@ -147,7 +155,7 @@ export class MapController {
   private lakeMarkers = new globalThis.Map<string, Marker>();
   private impacts: Impact[] = [];
   private popup: Popup | null = null;
-  private basemap: Basemap = "map";
+  private basemap: Basemap = "satellite";
   private layers: LakeLayers = {};
 
   constructor(container: HTMLElement) {
@@ -166,7 +174,10 @@ export class MapController {
     this.map.addControl(new AttributionControl({ compact: true }), "bottom-right");
     this.map.addControl(new ScaleControl({ unit: "metric" }), "bottom-right");
     this.loaded = new Promise((resolve) => this.map.once("load", () => resolve()));
-    this.loaded.then(() => this.addLakeLayers());
+    this.loaded.then(() => {
+      this.addLakeLayers();
+      this.applyBasemapColors();
+    });
   }
 
   destroy() {
@@ -372,7 +383,13 @@ export class MapController {
     const m = this.map;
     m.setLayoutProperty("basemap-osm", "visibility", b === "map" ? "visible" : "none");
     m.setLayoutProperty("basemap-esri", "visibility", b === "satellite" ? "visible" : "none");
-    const sat = b === "satellite";
+    this.applyBasemapColors();
+  }
+
+  /** Line colours that read on the current basemap (light map or dark imagery). */
+  private applyBasemapColors() {
+    const m = this.map;
+    const sat = this.basemap === "satellite";
     m.setPaintProperty("outline-current-line", "line-color", sat ? COLORS.outlineSat : COLORS.outline);
     m.setPaintProperty("outline-current-fill", "fill-color", sat ? COLORS.outlineSat : COLORS.outline);
     m.setPaintProperty("outlines-stack", "line-color", sat ? COLORS.outlineStackSat : COLORS.outlineStack);
