@@ -1,0 +1,22 @@
+{
+  "name": "aahat-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Aahat officials' dashboard: GLOF satellite watch for Himachal Pradesh",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "maplibre-gl": "^6.13.0",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7"
+  }
+}
