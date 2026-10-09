@@ -23,8 +23,10 @@ if [ -z "${SG_ID:-}" ]; then
     aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port $port --cidr 0.0.0.0/0 >/dev/null
   done
 fi
-MYIP=$(curl -fsS https://checkip.amazonaws.com)
-aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 22 --cidr "$MYIP/32" >/dev/null 2>&1 || true
+# Mobile carriers (carrier-grade NAT) can send SSH from a different public IP than the one an HTTPS
+# check reports, so allow a range: AAHAT_SSH_CIDR, or this machine's IP as a /32 by default.
+SSH_CIDR="${AAHAT_SSH_CIDR:-$(curl -fsS https://checkip.amazonaws.com)/32}"
+aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port 22 --cidr "$SSH_CIDR" >/dev/null 2>&1 || true
 
 # IAM role: the server may speak (Polly) and text (SNS) without stored keys
 if ! aws iam get-role --role-name "$AAHAT_NAME-ec2" >/dev/null 2>&1; then
