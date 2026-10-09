@@ -935,3 +935,20 @@ body.alert-mode {
     flex-direction: row;
   }
 }
+
+/* ---- Nearby floods (amber, informational) ------------------------------ */
+
+.nearby {
+  background: #fffbeb;
+  border: 1px solid #f3c64d;
+  border-left: 8px solid #d97706;
+}
+
+.badge-amber {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.nearby-title {
+  color: #78350f;
+}

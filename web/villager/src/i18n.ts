@@ -56,6 +56,15 @@ const hi = {
   outcome_margin: 'पानी गाँव के किनारे तक आ सकता है',
   outcome_outside: 'गाँव तक पानी आने की संभावना कम',
   riskLabel: 'झील का जोखिम स्तर',
+  nearbyTitle: 'पास से गुज़रने वाली बाढ़',
+  nearbyBadge: 'गाँव के पास से',
+  nearbyText: (lake: string, min: number | null, h: number | null) =>
+    `${lake} की बाढ़ आपके गाँव के पास से गुज़र सकती है` +
+    (min !== null ? ` — नदी तक पानी ~${min} मिनट में` : '') +
+    '।' +
+    (h !== null ? ` गाँव का मुख्य स्थान अनुमानित बाढ़ स्तर से लगभग ${h} मीटर ऊपर है;` : '') +
+    ' नदी किनारे के घर, खेत, सड़कें और पुल डूब सकते हैं।',
+  nearbyRiver: (m: string) => `गाँव के मुख्य स्थान से नदी लगभग ${m} मीटर दूर`,
   risk: { low: 'कम', moderate: 'मध्यम', high: 'अधिक', very_high: 'बहुत अधिक' } as Record<RiskLevel, string>,
 
   openMap: 'नक्शे पर देखें',
@@ -170,6 +179,15 @@ const en: Strings = {
   outcome_margin: 'Water may reach the edge of the village',
   outcome_outside: 'Water unlikely to reach the village',
   riskLabel: 'Lake risk level',
+  nearbyTitle: 'Floods passing close by',
+  nearbyBadge: 'Near your village',
+  nearbyText: (lake, min, h) =>
+    `The flood from ${lake} may pass close to your village` +
+    (min !== null ? ` — water could reach the river in ~${min} min` : '') +
+    '.' +
+    (h !== null ? ` The village's main point is about ${h} m above the estimated flood level;` : '') +
+    ' houses, fields, roads and bridges by the river could flood.',
+  nearbyRiver: (m) => `River about ${m} m from the village's main point`,
   risk: { low: 'Low', moderate: 'Moderate', high: 'High', very_high: 'Very high' },
 
   openMap: 'See on map',

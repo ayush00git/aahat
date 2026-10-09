@@ -57,7 +57,7 @@ See `.env.example`.
 | Route                  | Screen |
 |------------------------|--------|
 | `#/`                   | Home: village search (debounced), last-viewed village, install button |
-| `#/p/node/123`         | Village result: safe, unknown, or one card per threatening lake (nearest first) + "क्या करें" |
+| `#/p/node/123`         | Village result: safe, unknown, or one card per threatening lake (nearest first); amber cards for floods passing nearby (`nearby`); "क्या करें" |
 | `#/p/node/123/subscribe` | Sign up: SMS, phone call (shown as "coming soon"), or app notification (web push, shown only if the browser supports it and `GET /push/public-key` answers) |
 | `#/p/node/123/map`     | Map (lazy): village, latest lake outline, flood path, expected/severe corridors |
 | `#/alert?…`            | Full-screen red alert, opened from a push notification |

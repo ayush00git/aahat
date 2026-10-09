@@ -1,6 +1,5 @@
-// The threats endpoint has no coordinates; search results do. Remember them
-// when a village is found, and fall back to searching by name for links
-// opened directly.
+// Fallback coordinates for threats answers without lon/lat (saved by older
+// versions): remember them from search results, else search by name.
 
 import { searchPlaces, type Place } from './api';
 import { load, save } from './storage';

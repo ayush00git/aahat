@@ -13,7 +13,8 @@ export function MapScreen({ osm }: { osm: string }) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const data = state.kind === 'ok' ? state.data : null;
-  const lakesKey = data?.threats.map((th) => `${th.lake_id}:${th.status}`).join(',') ?? '';
+  const lakes = data ? [...data.threats, ...(data.nearby ?? [])] : [];
+  const lakesKey = lakes.map((th) => `${th.lake_id}:${th.status}`).join(',');
 
   useEffect(() => {
     if (!data || !el.current) return;
@@ -21,12 +22,16 @@ export function MapScreen({ osm }: { osm: string }) {
     let live = true;
     setStatus('loading');
     // MapLibre (~250 KB gzipped) is only downloaded when this screen opens.
-    Promise.all([import('../map/initMap'), placeCoords(data.osm, [data.name, data.name_hi])])
+    const coords =
+      data.lon != null && data.lat != null
+        ? ([data.lon, data.lat] as [number, number])
+        : placeCoords(data.osm, [data.name, data.name_hi]); // answers saved before the API had lon/lat
+    Promise.all([import('../map/initMap'), coords])
       .then(([{ initMap }, lonlat]) => {
         if (!live || !el.current) return;
         cleanup = initMap(el.current, {
           village: lonlat && { lon: lonlat[0], lat: lonlat[1], label: placeName(data, lang) },
-          lakes: data.threats.map((th) => ({ id: th.lake_id, name: lakeName(th, lang), status: th.status })),
+          lakes: lakes.map((th) => ({ id: th.lake_id, name: lakeName(th, lang), status: th.status })),
           onReady: () => live && setStatus('ready'),
           onError: () => live && setStatus('error'),
         });

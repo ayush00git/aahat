@@ -2,7 +2,7 @@ import { useI18n } from '../i18n';
 import { altName, dateTime, placeName } from '../format';
 import { href } from '../router';
 import { usePlace, type PlaceState } from '../usePlace';
-import { ThreatCard } from './ThreatCard';
+import { NearbyCard, ThreatCard } from './ThreatCard';
 import { Actions, EmergencyNumbers } from './Actions';
 import { MySubscriptions } from './MySubscriptions';
 
@@ -14,6 +14,7 @@ export function PlaceView({ osm }: { osm: string }) {
   const { data, savedAt } = state;
   const name = placeName(data, lang);
   const alt = altName(data, lang);
+  const nearby = data.nearby ?? [];
 
   return (
     <div class="stack">
@@ -56,26 +57,36 @@ export function PlaceView({ osm }: { osm: string }) {
           {data.threats.map((th) => (
             <ThreatCard key={th.lake_id} threat={th} />
           ))}
-          <div class="btn-row">
-            <a class="btn btn-primary" href={href.subscribe(osm)}>
-              {t.subscribeCta}
-            </a>
+        </section>
+      )}
+
+      {nearby.length > 0 && (
+        <section class="stack" aria-labelledby="near-h">
+          <h2 id="near-h" class="section-title nearby-title">
+            {t.nearbyTitle}
+          </h2>
+          {nearby.map((th) => (
+            <NearbyCard key={th.lake_id} threat={th} />
+          ))}
+        </section>
+      )}
+
+      {data.known && (
+        <div class="btn-row">
+          <a class={`btn ${data.threats.length > 0 ? 'btn-primary' : 'btn-secondary'}`} href={href.subscribe(osm)}>
+            {t.subscribeCta}
+          </a>
+          {(data.threats.length > 0 || nearby.length > 0) && (
             <a class="btn btn-secondary" href={href.map(osm)}>
               {t.openMap}
             </a>
-          </div>
-        </section>
+          )}
+        </div>
       )}
 
       <MySubscriptions osm={osm} />
 
-      {data.known && data.safe && (
-        <a class="btn btn-secondary" href={href.subscribe(osm)}>
-          {t.subscribeCta}
-        </a>
-      )}
-
-      {data.threats.length > 0 && <Actions />}
+      {(data.threats.length > 0 || nearby.length > 0) && <Actions />}
       <EmergencyNumbers />
     </div>
   );

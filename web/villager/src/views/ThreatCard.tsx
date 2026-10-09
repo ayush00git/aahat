@@ -82,3 +82,38 @@ function Scenario({ threat: th, scenario }: { threat: Threat; scenario: 'expecte
     </div>
   );
 }
+
+/**
+ * A lake whose flood passes near the village without reaching its mapped
+ * point. Uses the severe-scenario height (the lower, more cautious one).
+ */
+export function NearbyCard({ threat: th }: { threat: Threat }) {
+  const { t, lang } = useI18n();
+  const fast = th.arrival_min_fast;
+  const h = th.height_above_flood_m.severe;
+  const titleId = `near-${th.lake_id}`;
+  return (
+    <article class="card nearby" aria-labelledby={titleId}>
+      <span class="badge badge-amber">{t.nearbyBadge}</span>
+      <h3 id={titleId} class="lake-name">
+        {t.lakeLine(lakeName(th, lang))}
+      </h3>
+      <p>
+        {t.nearbyText(
+          lakeName(th, lang),
+          fast !== null ? wholeMinutes(fast) : null,
+          h !== null && h > 0 ? Math.round(h) : null,
+        )}
+      </p>
+      <ul class="facts">
+        {th.lateral_m != null && <li>{t.nearbyRiver(num(th.lateral_m, lang, 0))}</li>}
+        {th.km !== null && <li>{t.distance(num(th.km, lang, 0))}</li>}
+        {th.risk_level && (
+          <li>
+            {t.riskLabel}: <strong class={`risk-${th.risk_level}`}>{t.risk[th.risk_level]}</strong>
+          </li>
+        )}
+      </ul>
+    </article>
+  );
+}

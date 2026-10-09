@@ -5,7 +5,8 @@ import { load, save } from './storage';
 export const API_BASE = (import.meta.env.VITE_API_BASE ?? '/api').replace(/\/+$/, '');
 
 export type RiskLevel = 'low' | 'moderate' | 'high' | 'very_high';
-export type ThreatStatus = 'in_flood_path' | 'at_risk';
+/** "outside" only appears on `nearby` rows. */
+export type ThreatStatus = 'in_flood_path' | 'at_risk' | 'outside';
 /** Per-scenario outcome from the pipeline: flooded | margin | outside. */
 export type ScenarioOutcome = string;
 
@@ -35,6 +36,8 @@ export interface Threat {
   scenario_status: Pair<ScenarioOutcome>;
   flood_depth_m: Pair<number | null>;
   height_above_flood_m: Pair<number | null>;
+  /** Distance of the place from the river / flood line (nearby rows). */
+  lateral_m?: number | null;
 }
 
 export interface Threats {
@@ -44,6 +47,13 @@ export interface Threats {
   known: boolean;
   safe: boolean;
   threats: Threat[];
+  /**
+   * Lakes whose flood passes within ~2 km of the place without reaching its
+   * mapped point. Optional: answers saved by older app versions lack it.
+   */
+  nearby?: Threat[];
+  lon?: number | null;
+  lat?: number | null;
 }
 
 export type Channel = 'sms' | 'voice' | 'webpush';
