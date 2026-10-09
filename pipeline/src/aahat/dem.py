@@ -42,7 +42,9 @@ def read_dem(grid: Grid) -> np.ndarray:
         path = cached_file(href)
         if path is None:
             continue
-        part = read_to_grid(str(path), grid, Resampling.bilinear)
+        # The tiles declare no nodata value; without one, pixels outside this tile would come back
+        # as 0 (not NaN) and block the other tiles from filling in. -32767 never occurs in the data.
+        part = read_to_grid(str(path), grid, Resampling.bilinear, nodata=-32767.0)
         fill = np.isnan(out) & ~np.isnan(part)
         out[fill] = part[fill]
     return out

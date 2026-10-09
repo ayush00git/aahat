@@ -85,3 +85,32 @@ def test_scl_cloud_shadow_vouches_for_dark_water_but_never_votes_dry(monkeypatch
     obs = w.observe(scene, scl, GRID, terrain, WaterParams())
     assert obs.water[:, :50].all() and obs.observed[:, :50].all()
     assert not obs.observed[:, 50:].any()  # shadowed land is unknown, not dry
+
+
+def test_read_dem_mosaics_two_tiles_without_zero_fill(tmp_path, monkeypatch):
+    import rasterio
+    from rasterio.transform import from_origin
+
+    import aahat.dem as dem_mod
+
+    paths = {}
+    for lon, value in ((77, 1000.0), (78, 2000.0)):
+        p = tmp_path / f"t{lon}.tif"
+        with rasterio.open(
+            p,
+            "w",
+            driver="GTiff",
+            width=10,
+            height=10,
+            count=1,
+            dtype="float32",
+            crs="EPSG:4326",
+            transform=from_origin(lon, 33, 0.1, 0.1),
+        ) as dst:
+            dst.write(np.full((1, 10, 10), value, "float32"))
+        paths[lon] = p
+    monkeypatch.setattr(dem_mod, "tiles_for", lambda grid: ["t77", "t78"])
+    monkeypatch.setattr(dem_mod, "cached_file", lambda href: paths[int(href[1:])])
+    grid = Grid(CRS.from_epsg(4326), Affine(0.05, 0, 77.5, 0, -0.05, 32.8), 20, 4)  # spans both tiles
+    z = dem_mod.read_dem(grid)
+    assert (z[:, :10] == 1000).all() and (z[:, 10:] == 2000).all()
