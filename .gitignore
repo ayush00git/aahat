@@ -22,3 +22,6 @@ cdk.out/
 .aws-sam/
 .env
 .env.*
+
+# go
+api/aahat-server

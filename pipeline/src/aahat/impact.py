@@ -65,13 +65,19 @@ def assess(d: Downstream, assets: list[Asset], max_lateral_m: float = 3000.0) ->
         km = path.project(ref) / 1000
         if km > station_km[-1] + 0.5:
             continue
-        i = int(np.clip(np.searchsorted(station_km, km), 0, len(station_km) - 1))
+        # the flood level that applies here is the nearest station's, as for the corridor itself (on a
+        # bend the station at the projected km can be a different reach)
+        if d.station_xy is not None:
+            i = int(np.argmin(np.hypot(d.station_xy[:, 0] - ref.x, d.station_xy[:, 1] - ref.y)))
+        else:
+            i = int(np.clip(np.searchsorted(station_km, km), 0, len(station_km) - 1))
         st = d.stations[i]
         z = float(sample(d.dem, d.grid, np.array([ref.x]), np.array([ref.y]))[0])
         height = None if not np.isfinite(z) else round(z - st.wse_m, 1)
-        flooded = inside.intersects(g) or (
-            height is not None and height <= 0 and g.distance(path) <= d.params["corridor_m"]
-        )
+        below = height is not None and height <= 0 and g.distance(path) <= d.params["corridor_m"]
+        # A settlement or school is one OSM point: flooded only if its ground is below the flood level.
+        # Lines and areas (bridges, roads, plants) count as flooded where they enter the corridor.
+        flooded = below if g.geom_type == "Point" else (inside.intersects(g) or below)
         if flooded:
             status = "flooded"
         elif (
