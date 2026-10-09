@@ -195,5 +195,125 @@
     "kind": "glacial",
     "notes": "Found by the 2025 high-altitude sweep (aahat sweep) and placed from Sentinel-2 imagery; no name in OpenStreetMap. Drains through Kashang khad, past the Kashang hydro project, into the Sutlej.",
     "sources": []
+  },
+  {
+    "id": "suraj-tal",
+    "name": "Suraj Tal",
+    "name_hi": "सूरज ताल",
+    "lat": 32.76276,
+    "lon": 77.39777,
+    "aoi_radius_m": 1000,
+    "district": "Lahaul and Spiti",
+    "basin": "Bhaga (Chenab)",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from OSM way 274107378 and checked against 2025 Sentinel-2 (0.0305 km2).",
+    "sources": [
+      "https://www.openstreetmap.org/way/274107378"
+    ]
+  },
+  {
+    "id": "bhrigu-lake",
+    "name": "Bhrigu Lake",
+    "name_hi": "भृगु झील",
+    "lat": 32.29333,
+    "lon": 77.24248,
+    "aoi_radius_m": 1000,
+    "district": "Kullu",
+    "basin": "Beas",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from OSM way 402138654 and checked against 2025 Sentinel-2 (0.0094 km2).",
+    "sources": [
+      "https://www.openstreetmap.org/way/402138654"
+    ]
+  },
+  {
+    "id": "manimahesh-lake",
+    "name": "Manimahesh Lake",
+    "name_hi": "मणिमहेश झील",
+    "lat": 32.3949,
+    "lon": 76.63725,
+    "aoi_radius_m": 1000,
+    "district": "Chamba",
+    "basin": "Budhil (Ravi)",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from OSM way 62067190 and checked against 2025 Sentinel-2 (0.0028 km2).",
+    "sources": [
+      "https://www.openstreetmap.org/way/62067190"
+    ]
+  },
+  {
+    "id": "beas-kund",
+    "name": "Beas Kund",
+    "name_hi": "ब्यास कुंड",
+    "lat": 32.36651,
+    "lon": 77.08555,
+    "aoi_radius_m": 1000,
+    "district": "Kullu",
+    "basin": "Beas",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from OSM relation 6033203; not confirmed from imagery (aahat discover found no open water of 2000 m2 or more within 1.5 km in 2025 Sentinel-2, likely small, frozen or snow-covered).",
+    "sources": [
+      "https://www.openstreetmap.org/relation/6033203"
+    ]
+  },
+  {
+    "id": "mantalai-lake",
+    "name": "Mantalai Lake",
+    "name_hi": "मंतलाई झील",
+    "lat": 31.86721,
+    "lon": 77.77967,
+    "aoi_radius_m": 1000,
+    "district": "Kullu",
+    "basin": "Parbati (Beas)",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from 2025 Sentinel-2 water 260 m from the Mantalai temple (OSM node 4383748797; the lake itself is not mapped as water in OSM) and checked against 2025 Sentinel-2 (0.0096 km2).",
+    "sources": [
+      "https://www.openstreetmap.org/node/4383748797"
+    ]
+  },
+  {
+    "id": "dashair-lake",
+    "name": "Dashair Lake",
+    "name_hi": "दशैर झील",
+    "lat": 32.37516,
+    "lon": 77.22409,
+    "aoi_radius_m": 1000,
+    "district": "Kullu",
+    "basin": "Beas",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from OSM way 584229179 (Dashaur Lake) and checked against 2025 Sentinel-2 (0.005 km2).",
+    "sources": [
+      "https://www.openstreetmap.org/way/584229179"
+    ]
+  },
+  {
+    "id": "dhankar-lake",
+    "name": "Dhankar Lake",
+    "name_hi": "धनकर झील",
+    "lat": 32.09096,
+    "lon": 78.22801,
+    "aoi_radius_m": 1000,
+    "district": "Lahaul and Spiti",
+    "basin": "Spiti (Sutlej)",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from OSM way 41802008 (Dhankar Tso) and checked against 2025 Sentinel-2 (0.0101 km2).",
+    "sources": [
+      "https://www.openstreetmap.org/way/41802008"
+    ]
+  },
+  {
+    "id": "kareri-lake",
+    "name": "Kareri Lake",
+    "name_hi": "करेरी झील",
+    "lat": 32.32564,
+    "lon": 76.27384,
+    "aoi_radius_m": 1000,
+    "district": "Kangra",
+    "basin": "Nyund (Beas)",
+    "kind": "glacial",
+    "notes": "Well-known high-altitude lake; seed placed from OSM way 45019042; not confirmed from imagery (aahat discover found no open water of 2000 m2 or more within 1.5 km in 2025 Sentinel-2, likely small, frozen or snow-covered).",
+    "sources": [
+      "https://www.openstreetmap.org/way/45019042"
+    ]
   }
 ]
