@@ -9,7 +9,10 @@ def terrain(slope=5.0, share=0.4):
 
 
 def years(areas):
-    return [{"year": y, "status": "ok", "area_m2": a, "last_day": f"{y}-10-20"} for y, a in areas.items()]
+    return [
+        {"year": y, "status": "ok", "area_m2": a, "uncertainty_m2": 0.01 * a, "last_day": f"{y}-10-20"}
+        for y, a in areas.items()
+    ]
 
 
 def test_huggel_volume_matches_formula():
@@ -25,10 +28,21 @@ def test_rule_is_linear_and_clamped():
 
 def test_growth_needs_three_full_seasons_and_ignores_partial_ones():
     ys = years({2017: 1.0e6, 2018: 1.03e6})
-    assert growth_as_of(ys, 2018)[0] is None
+    assert growth_as_of(ys, 2018).pct_per_yr is None
     ys += [{"year": 2019, "status": "partial", "area_m2": 0.5e6}, {"year": 2020, "status": "ok", "area_m2": 1.09e6}]
-    pct, _ = growth_as_of(ys, 2020)
-    assert 2.5 < pct < 3.5  # the partial 0.5 km2 season is ignored
+    g = growth_as_of(ys, 2020)
+    assert 2.5 < g.pct_per_yr < 3.5  # the partial 0.5 km2 season is ignored
+    assert g.significant
+
+
+def test_growth_within_measurement_noise_does_not_count():
+    ys = years({2017: 0.219e6, 2018: 0.226e6, 2019: 0.236e6, 2020: 0.222e6, 2021: 0.247e6, 2022: 0.226e6})
+    for r in ys:
+        r["uncertainty_m2"] = 0.021e6
+    g = growth_as_of(ys, 2022)
+    assert not g.significant
+    rec = score_as_of("x", ys, lambda y: terrain(), 2022)
+    assert next(f for f in rec.factors if f.key == "growth").score == 0
 
 
 def test_replay_never_sees_the_future():
@@ -41,12 +55,19 @@ def test_replay_never_sees_the_future():
 
 
 def test_levels():
-    assert level_for(10) == "low" and level_for(30) == "moderate" and level_for(60) == "high" and level_for(80) == "very_high"
+    assert level_for(10) == "low" and level_for(30) == "moderate" and level_for(50) == "high" and level_for(70) == "very_high"
 
 
-def test_contributions_add_up_and_weights_sum_to_one():
+def test_score_is_size_times_likelihood_and_group_weights_sum_to_one():
     from aahat.risk import FACTORS
 
-    assert math.isclose(sum(f.weight for f in FACTORS), 1.0)
+    for group in ("size", "likelihood"):
+        assert math.isclose(sum(f.weight for f in FACTORS if f.group == group), 1.0)
     rec = score_as_of("x", years({2017: 1.0e6, 2018: 1.02e6, 2019: 1.04e6}), lambda y: terrain(), 2019)
-    assert math.isclose(rec.score, sum(f.contribution for f in rec.factors), abs_tol=0.2)
+    assert math.isclose(rec.score, 100 * rec.size * rec.likelihood, abs_tol=0.2)
+
+
+def test_small_lake_in_steep_terrain_scores_below_large_growing_lake():
+    small = score_as_of("s", years({2017: 0.09e6, 2018: 0.09e6, 2019: 0.09e6}), lambda y: terrain(9, 0.45), 2019)
+    large = score_as_of("l", years({2017: 0.86e6, 2018: 0.88e6, 2019: 0.90e6}), lambda y: terrain(4, 0.27), 2019)
+    assert large.score > small.score

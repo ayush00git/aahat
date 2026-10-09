@@ -44,10 +44,10 @@ def cmd_risk(args) -> None:
     lakes = load_lakes() if args.lake == "all" else [get_lake(args.lake)]
     for lake in lakes:
         out = run_risk(Path(args.out) / "lakes" / lake.id)
-        print(f"\n{lake.name}: replay (season -> score, level)")
+        print(f"\n{lake.name}: replay (season: score = 100 x size x likelihood, level)")
         for r in out["replay"]:
-            parts = ", ".join(f"{f['key']} {f['contribution']:.0f}" for f in r["factors"])
-            print(f"  {r['as_of_season']}  {r['score']:5.1f}  {r['level']:<9}  [{parts}]")
+            parts = ", ".join(f"{f['key']} {f['score']:.2f}" for f in r["factors"])
+            print(f"  {r['as_of_season']}  {r['score']:5.1f} = {r['size']:.2f} x {r['likelihood']:.2f}  {r['level']:<9}  [{parts}]")
     build_index(Path(args.out))
 
 
