@@ -42,7 +42,8 @@ def read_to_grid(
 ) -> np.ndarray:
     """Warp one band of a raster (remote URL or local path) onto `grid`.
 
-    Pixels outside the source are NaN (or 0 for ints).
+    Pixels outside the source are NaN (or 0 for ints). When the grid is at least twice as coarse as
+    the source, the coarsest overview no finer than the grid is read instead: far fewer bytes.
     """
     fill = np.nan if np.dtype(dtype).kind == "f" else 0
     last_err: Exception | None = None
@@ -51,7 +52,10 @@ def read_to_grid(
         # A throwaway query parameter (ignored by S3) makes each retry a fresh, uncached read.
         url = href if attempt == 0 or "://" not in href else f"{href}{'&' if '?' in href else '?'}retry={attempt}"
         try:
-            with rasterio.Env(**GDAL_ENV), rasterio.open(url) as src:
+            with rasterio.Env(**GDAL_ENV):
+                level = _overview_level(url, grid.res)
+                src_ctx = rasterio.open(url, overview_level=level) if level is not None else rasterio.open(url)
+            with rasterio.Env(**GDAL_ENV), src_ctx as src:
                 src_nodata = src.nodata if nodata is None else nodata
                 with WarpedVRT(
                     src,
@@ -72,3 +76,17 @@ def read_to_grid(
             log.warning("read failed (%s), retry %d in %ds: %s", href.rsplit("/", 1)[-1], attempt + 1, wait, e)
             time.sleep(wait)
     raise RuntimeError(f"could not read {href}") from last_err
+
+
+def _overview_level(url: str, target_res: float) -> int | None:
+    """Index of the coarsest COG overview whose pixel size is still <= target_res, or None."""
+    with rasterio.open(url) as src:
+        native = abs(src.res[0])
+        if src.crs is None or not src.crs.is_projected or target_res < 2 * native:
+            return None
+        factors = src.overviews(1)
+    level = None
+    for i, f in enumerate(factors):
+        if native * f <= target_res + 1e-6:
+            level = i
+    return level

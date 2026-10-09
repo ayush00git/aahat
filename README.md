@@ -118,6 +118,20 @@ NRSC give "Sissu in just 21 minutes" for Gepang Gath; our fast–expected arriva
 All of it is a screening estimate: normal depth on a 30 m DEM with no river bathymetry, empirical peaks with
 large scatter, and only what OpenStreetMap maps.
 
+### New barrier lakes
+
+`uv run aahat barrier --lake <id> --as-of YYYY-MM-DD` scans that lake's downstream river in 6 km windows
+(or any reach with `--reach "lon,lat;lon,lat"`) and flags **new water** on the river line: water in the clearest
+scenes of the last 20 days that was (almost) never water in the year before (ending 30 days earlier), within 1 km
+of the river, at least 0.02 km² of new water and 60 m wide (a river overtopping its banks is a thin sliver; a
+dammed lake is a blob). Only scenes up to `--as-of` are used. Reads at 20 m from COG overviews.
+
+- **Replay, Sedongpu (Yarlung Tsangpo), 31 Oct 2018:** three candidates on the lake backed up behind the
+  debris dam that formed on 29 Oct ([SANDRP](https://sandrp.in/2018/10/19/landslide-dam-on-tsangpo-creates-flood-disaster-risk-for-siang/)).
+- **False-positive check:** 0 candidates along the first 30 km below Gepang Gath as of 8 Oct 2026.
+- Limits: lakes narrower than about 3 pixels (60 m) are missed (e.g. Kunwari, Uttarakhand, ~50 m wide), and
+  cloud during the monsoon hides short-lived lakes. Area counts only the new water, not the old channel inside it.
+
 ## Data
 
 - Sentinel-2 L2A COGs via [Earth Search](https://earth-search.aws.element84.com/v1) (AWS Open Data, us-west-2), read in place with HTTP range requests.

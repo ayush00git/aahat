@@ -76,6 +76,31 @@ def cmd_downstream(args) -> None:
     build_index(Path(args.out))
 
 
+def cmd_barrier(args) -> None:
+    from datetime import UTC, date, datetime
+
+    from shapely.geometry import LineString, shape
+
+    from .barrier import candidates_json, scan_reach
+
+    as_of = date.fromisoformat(args.as_of) if args.as_of else datetime.now(UTC).date()
+    if args.reach:
+        reach = LineString([tuple(map(float, pt.split(","))) for pt in args.reach.split(";")])
+        name = args.name or "reach"
+    else:
+        path = Path(args.out) / "lakes" / args.lake / "flood_path.geojson"
+        reach = shape(json.loads(path.read_text())["geometry"])
+        name = args.name or args.lake
+    cands = scan_reach(reach, as_of, max_km=args.max_km)
+    out_dir = Path(args.out) / "barrier"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    result = {"reach": name, "as_of": as_of.isoformat(), "candidates": candidates_json(cands)}
+    (out_dir / f"{name}_{as_of.isoformat()}.json").write_text(json.dumps(result, indent=1))
+    print(f"{name} as of {as_of}: {len(cands)} new-water candidate(s)")
+    for c in cands:
+        print(f"  km {c.km_along_reach:6.1f}  {c.lat:.4f},{c.lon:.4f}  {c.area_m2 / 1e6:.3f} km2  width {c.width_m} m")
+
+
 def cmd_summary(args) -> None:
     index = build_index(Path(args.out))
     years = sorted({r["year"] for lake in index["lakes"] for r in lake["years"]})
@@ -148,6 +173,15 @@ def main(argv: list[str] | None = None) -> None:
     w.add_argument("--lake", required=True, help="lake id from the catalogue, or 'all'")
     w.add_argument("--out", default="out")
     w.set_defaults(func=cmd_downstream)
+
+    b = sub.add_parser("barrier", help="scan a river reach for new barrier (landslide-dammed) lakes")
+    b.add_argument("--lake", help="scan this lake's downstream flood path")
+    b.add_argument("--reach", help="or a reach as 'lon,lat;lon,lat;...'")
+    b.add_argument("--name", help="name for the output file")
+    b.add_argument("--as-of", help="YYYY-MM-DD (default today); only scenes up to this date are used")
+    b.add_argument("--max-km", type=float, default=None)
+    b.add_argument("--out", default="out")
+    b.set_defaults(func=cmd_barrier)
 
     m = sub.add_parser("summary", help="table of all lake series; writes lakes/index.json")
     m.add_argument("--out", default="out")
