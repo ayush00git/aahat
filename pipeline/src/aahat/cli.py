@@ -114,8 +114,8 @@ def cmd_sweep(args) -> None:
     from .inventory import WINDOWS, sweep
 
     windows = [w for w in WINDOWS if not args.only or args.only.lower() in w["name"].lower()]
-    lakes = sweep(windows, args.year, Path(args.out))
-    print(f"{len(lakes)} lakes >= 0.1 km2 above 3500 m in {len(windows)} windows ({args.year})")
+    lakes = sweep(windows, args.year, Path(args.out), min_area_m2=args.min_area)
+    print(f"{len(lakes)} lakes >= {args.min_area / 1e6:g} km2 above 3500 m in {len(windows)} windows ({args.year})")
     for x in lakes:
         print(
             f"  {x.area_km2:7.3f} km2  {x.elev_m:5.0f} m  {x.lat:.4f},{x.lon:.4f}  {x.window:<24} near {x.near_place} ({x.near_place_km} km)"
@@ -211,6 +211,7 @@ def main(argv: list[str] | None = None) -> None:
     sw = sub.add_parser("sweep", help="find large high-altitude lakes in the built-in windows")
     sw.add_argument("--year", type=int, default=2025)
     sw.add_argument("--only", help="only windows whose name contains this")
+    sw.add_argument("--min-area", type=float, default=50_000, help="m2")
     sw.add_argument("--out", default="out")
     sw.set_defaults(func=cmd_sweep)
 

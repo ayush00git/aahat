@@ -120,14 +120,26 @@ def label_with_places(lakes: list[FoundLake], places_path: Path) -> None:
         lake.near_place, lake.near_place_km = places[i]["name"], round(float(d[i]), 1)
 
 
-def sweep(windows: list[dict], year: int, out_dir: Path, radius_m: float = 10_000) -> list[FoundLake]:
+def sweep(windows: list[dict], year: int, out_dir: Path, min_area_m2: float = 50_000) -> list[FoundLake]:
+    """Each 20 km window is mapped as four 10 km sub-windows: a 20 km box straddling two Sentinel-2 tiles
+    lies fully inside neither, which would leave the window without any scene."""
     found: list[FoundLake] = []
     for w in windows:
         log.info("sweep: %s", w["name"])
-        try:
-            found += find_lakes(w["lat"], w["lon"], radius_m, year, window=w["name"])
-        except Exception as e:  # noqa: BLE001 - one bad window should not stop the sweep
-            log.warning("sweep window %s failed: %s", w["name"], e)
+        dlat, dlon = 5 / 111.0, 5 / (111.0 * math.cos(math.radians(w["lat"])))
+        for sy in (-1, 1):
+            for sx in (-1, 1):
+                try:
+                    found += find_lakes(
+                        w["lat"] + sy * dlat,
+                        w["lon"] + sx * dlon,
+                        5_000,
+                        year,
+                        min_area_m2=min_area_m2,
+                        window=w["name"],
+                    )
+                except Exception as e:  # noqa: BLE001 - one bad window should not stop the sweep
+                    log.warning("sweep window %s failed: %s", w["name"], e)
     lakes = dedupe(found)
     label_with_places(lakes, out_dir / "places" / "index.json")
     path = out_dir / "inventory" / f"candidates_{year}.json"
