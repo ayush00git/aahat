@@ -11,7 +11,7 @@ RSYNC="rsync -az --delete -e \"ssh -i $AAHAT_KEY_FILE -o StrictHostKeyChecking=a
 
 echo "== build"
 (cd "$ROOT/api" && GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o "$ROOT/api/bin/aahat-server" ./cmd/server)
-for app in villager dashboard; do
+for app in ${AAHAT_WEB_APPS:-villager dashboard}; do
   if [ -z "${AAHAT_SKIP_WEB:-}" ] && [ -f "$ROOT/web/$app/package.json" ]; then
     (cd "$ROOT/web/$app" && npm ci --silent && VITE_API_BASE=/api npm run build --silent)
   fi
@@ -21,7 +21,7 @@ echo "== ship"
 $SSH 'sudo mkdir -p /tmp/aahat/data/lakes && sudo chown -R ec2-user /tmp/aahat'
 eval $RSYNC "$ROOT/api/bin/aahat-server" "ec2-user@$PUBLIC_IP:/tmp/aahat/"
 eval $RSYNC --include='*/' --include='*.json' --include='*.geojson' --exclude='*' "$ROOT/pipeline/out/lakes/" "ec2-user@$PUBLIC_IP:/tmp/aahat/data/lakes/"
-for app in villager dashboard; do
+for app in ${AAHAT_WEB_APPS:-villager dashboard}; do
   [ -z "${AAHAT_SKIP_WEB:-}" ] && [ -d "$ROOT/web/$app/dist" ] && eval $RSYNC "$ROOT/web/$app/dist/" "ec2-user@$PUBLIC_IP:/tmp/aahat/web-$app/"
 done
 sed "s/{\$SITE_HOST}/$SITE_HOST/" Caddyfile.tmpl > /tmp/aahat-Caddyfile
@@ -33,7 +33,7 @@ $SSH "AWS_REGION=$AWS_REGION AAHAT_SMS=${AAHAT_SMS:-} bash -s" <<'REMOTE'
 set -euo pipefail
 sudo install -m 755 /tmp/aahat/aahat-server /srv/aahat/bin/aahat-server
 sudo rsync -a --delete /tmp/aahat/data/ /srv/aahat/data/
-for app in villager dashboard; do
+for app in ${AAHAT_WEB_APPS:-villager dashboard}; do
   [ -d /tmp/aahat/web-$app ] && sudo rsync -a --delete /tmp/aahat/web-$app/ /srv/aahat/web/$app/
 done
 printf 'AWS_REGION=%s\nAAHAT_POLLY=1\nAAHAT_SMS=%s\n' "$AWS_REGION" "$AAHAT_SMS" | sudo tee /srv/aahat/api.env >/dev/null
