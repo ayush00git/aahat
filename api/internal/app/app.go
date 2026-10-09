@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,6 +20,7 @@ import (
 	"github.com/ayush00git/aahat/api/internal/data"
 	"github.com/ayush00git/aahat/api/internal/httpapi"
 	"github.com/ayush00git/aahat/api/internal/store"
+	"github.com/ayush00git/aahat/api/internal/voice"
 )
 
 type Backends struct {
@@ -27,18 +29,29 @@ type Backends struct {
 	Notifier      alert.Notifier
 	WebhookSecret string
 	Logger        *slog.Logger
+	Voice         *voice.Polly // optional: spoken warnings
+	PushPublicKey string       // optional: VAPID public key for the web app
 }
 
 // Handler builds the API handler.
 func Handler(b Backends) http.Handler {
 	catalog := data.NewCatalog(b.Data)
-	svc := alert.NewService(catalog, b.Store, b.Store, alert.NewDispatcher(b.Notifier))
+	dispatcher := alert.NewDispatcher(b.Notifier)
+	dispatcher.Log = b.Logger
+	var audioPath func(string) string
+	if b.Voice != nil { // not a nil *Polly inside a non-nil interface
+		dispatcher.Voice = b.Voice
+		audioPath = b.Voice.Path
+	}
+	svc := alert.NewService(catalog, b.Store, b.Store, dispatcher)
 	return httpapi.New(httpapi.Config{
 		Catalog:       catalog,
 		Store:         b.Store,
 		Alerts:        svc,
 		WebhookSecret: []byte(b.WebhookSecret),
 		Logger:        b.Logger,
+		PushPublicKey: b.PushPublicKey,
+		AudioPath:     audioPath,
 	})
 }
 
@@ -50,10 +63,18 @@ func Handler(b Backends) http.Handler {
 //	AAHAT_WEBHOOK_SECRET                  sensor webhook HMAC secret
 func FromEnv(ctx context.Context, log *slog.Logger) (Backends, error) {
 	b := Backends{
-		Notifier:      alert.NewLogNotifier(log),
 		WebhookSecret: os.Getenv("AAHAT_WEBHOOK_SECRET"),
 		Logger:        log,
 	}
+	stateDir := os.Getenv("AAHAT_STATE_DIR")
+	if stateDir == "" {
+		stateDir = filepath.Join(os.TempDir(), "aahat")
+	}
+	notifier, speaker, pushKey, err := Channels(ctx, log, stateDir)
+	if err != nil {
+		return b, err
+	}
+	b.Notifier, b.Voice, b.PushPublicKey = notifier, speaker, pushKey
 	ttl := 5 * time.Minute
 	if v := os.Getenv("AAHAT_CACHE_TTL"); v != "" {
 		d, err := time.ParseDuration(v)

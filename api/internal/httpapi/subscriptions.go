@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -9,18 +10,19 @@ import (
 
 func (s *server) createSubscription(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		PlaceOSM  string `json:"place_osm"`
-		PlaceName string `json:"place_name"`
-		Phone     string `json:"phone"`
-		Lang      string `json:"lang"`
-		Channel   string `json:"channel"`
+		PlaceOSM  string          `json:"place_osm"`
+		PlaceName string          `json:"place_name"`
+		Phone     string          `json:"phone"`
+		Lang      string          `json:"lang"`
+		Channel   string          `json:"channel"`
+		Push      json.RawMessage `json:"push_subscription"`
 	}
 	if !readJSON(w, r, &in) {
 		return
 	}
 	sub := alert.Subscription{
 		PlaceOSM: in.PlaceOSM, PlaceName: in.PlaceName, Phone: in.Phone,
-		Lang: in.Lang, Channel: in.Channel,
+		Lang: in.Lang, Channel: in.Channel, Push: in.Push,
 	}
 	if err := sub.Normalize(); err != nil {
 		s.fail(w, r, err, "")
@@ -32,6 +34,7 @@ func (s *server) createSubscription(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "")
 		return
 	}
+	sub.Push = nil // the browser already has it; don't echo keys back
 	writeJSON(w, http.StatusCreated, sub)
 }
 
@@ -48,6 +51,9 @@ func (s *server) listSubscriptions(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.fail(w, r, err, "")
 		return
+	}
+	for i := range subs {
+		subs[i].Push = nil // push keys stay server-side
 	}
 	writeJSON(w, http.StatusOK, subs)
 }

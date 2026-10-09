@@ -3,6 +3,7 @@ package alert
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -57,7 +58,8 @@ func TestLogNotifierRecords(t *testing.T) {
 	ev := &Event{ID: "evt_2", Recipients: []Recipient{{SubscriptionID: "a", Phone: "+910000000001", Lang: "hi", Channel: "sms", Message: "x"}}}
 	d.Dispatch(context.Background(), ev)
 	sent := n.Sent()
-	if len(sent) != 1 || sent[0] != (Message{EventID: "evt_2", SubscriptionID: "a", To: "+910000000001", Channel: "sms", Lang: "hi", Text: "x"}) {
+	want := Message{EventID: "evt_2", SubscriptionID: "a", To: "+910000000001", Channel: "sms", Lang: "hi", Title: title("hi"), Text: "x"}
+	if len(sent) != 1 || !reflect.DeepEqual(sent[0], want) {
 		t.Errorf("sent = %+v", sent)
 	}
 }
@@ -68,7 +70,7 @@ func TestHindiTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "चेतावनी: लम डल झील से बाढ़ का खतरा। आपके गाँव Kalsuin तक पानी लगभग 60.8 मिनट में पहुँच सकता है। तुरंत ऊँचे स्थान पर जाएँ।"
+	want := "चेतावनी: लम डल झील से बाढ़ का खतरा। आपके गाँव Kalsuin तक पानी लगभग 60 मिनट में पहुँच सकता है। तुरंत ऊँचे स्थान पर जाएँ।"
 	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
@@ -84,5 +86,31 @@ func TestLakeLabel(t *testing.T) {
 		if got := lakeLabel(tc.lang, tc.name); got != tc.want {
 			t.Errorf("lakeLabel(%q, %q) = %q", tc.lang, tc.name, got)
 		}
+	}
+}
+
+type fakeVoice struct{ calls int }
+
+func (f *fakeVoice) AudioURL(_ context.Context, text, lang string) (string, error) {
+	f.calls++
+	return "/audio/" + lang + ".mp3", nil
+}
+
+func TestDispatcherSynthesizesEachDistinctMessageOnce(t *testing.T) {
+	n := NewLogNotifier(nil)
+	v := &fakeVoice{}
+	d := NewDispatcher(n)
+	d.Voice = v
+	ev := &Event{ID: "evt_3", Recipients: []Recipient{
+		{SubscriptionID: "a", Lang: "hi", Channel: "sms", Message: "same"},
+		{SubscriptionID: "b", Lang: "hi", Channel: "voice", Message: "same"},
+		{SubscriptionID: "c", Lang: "en", Channel: "sms", Message: "other"},
+	}}
+	d.Dispatch(context.Background(), ev)
+	if v.calls != 2 {
+		t.Errorf("synthesized %d times, want 2", v.calls)
+	}
+	if ev.Recipients[1].AudioURL != "/audio/hi.mp3" || n.Sent()[2].AudioURL != "/audio/en.mp3" {
+		t.Errorf("audio urls not set: %+v", ev.Recipients)
 	}
 }

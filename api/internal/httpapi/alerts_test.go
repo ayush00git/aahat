@@ -138,7 +138,7 @@ func TestTriggerPlan(t *testing.T) {
 			}
 			// The Bhiyari message carries its data-file arrival time.
 			for _, rc := range ev.Recipients {
-				if rc.PlaceOSM == bhiyari && (*rc.ArrivalMinFast != 117.1 || !strings.Contains(rc.Message, "117.1 मिनट") || !strings.Contains(rc.Message, ev.LakeNameHi)) {
+				if rc.PlaceOSM == bhiyari && (*rc.ArrivalMinFast != 117.1 || !strings.Contains(rc.Message, "117 मिनट") || !strings.Contains(rc.Message, ev.LakeNameHi)) {
 					t.Errorf("bhiyari recipient = %+v", rc)
 				}
 			}
@@ -171,7 +171,7 @@ func TestEnglishMessage(t *testing.T) {
 	env := newEnv(t, nil)
 	subscribe(t, env, "en", bhiyari)
 	ev := decode[alert.Event](t, env.do(t, "POST", "/trigger", map[string]any{"lake_id": "gepang-gath"}))
-	want := "WARNING: Flood danger from Gepang Gath lake. Water may reach your village Bhiyari in about 117.1 minutes. Move to high ground immediately."
+	want := "WARNING: Flood danger from Gepang Gath lake. Water may reach your village Bhiyari in about 117 minutes. Move to high ground immediately."
 	if len(ev.Recipients) != 1 || ev.Recipients[0].Message != want {
 		t.Errorf("got %+v", ev.Recipients)
 	}

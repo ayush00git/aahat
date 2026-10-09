@@ -2,6 +2,7 @@ package alert
 
 import (
 	"bytes"
+	"math"
 	"strconv"
 	"strings"
 	"text/template"
@@ -20,6 +21,39 @@ var messageTemplates = map[string]*template.Template{
 			`Water may reach your village{{if .PlaceName}} {{.PlaceName}}{{end}} ` +
 			`{{if .ArrivalMinFast}}in about {{.ArrivalMinFast}} minutes{{else}}soon{{end}}. ` +
 			`Move to high ground immediately.`)),
+}
+
+// titles head push notifications and voice calls.
+var titles = map[string]string{
+	LangHindi:   "आहट: बाढ़ चेतावनी",
+	LangEnglish: "Aahat: flood warning",
+}
+
+func title(lang string) string {
+	if t, ok := titles[lang]; ok {
+		return t
+	}
+	return titles[LangHindi]
+}
+
+// smsTemplates are short versions for SMS: a Hindi (Unicode) SMS part holds only 70 characters.
+var smsTemplates = map[string]*template.Template{
+	LangHindi: template.Must(template.New("hi-sms").Parse(
+		`बाढ़ चेतावनी: {{.PlaceName}} में ~{{.ArrivalMinFast}} मिनट में पानी। ऊँचे स्थान पर जाएँ`)),
+	LangEnglish: template.Must(template.New("en-sms").Parse(
+		`FLOOD WARNING: water may reach {{.PlaceName}} in ~{{.ArrivalMinFast}} min. Go to high ground now.`)),
+}
+
+func renderShort(lang string, d messageData) string {
+	t, ok := smsTemplates[lang]
+	if !ok {
+		t = smsTemplates[LangHindi]
+	}
+	var b bytes.Buffer
+	if t.Execute(&b, d) != nil {
+		return ""
+	}
+	return b.String()
 }
 
 // messageData is what a template sees. Names are already in the message's
@@ -57,10 +91,11 @@ func renderMessage(lang string, d messageData) (string, error) {
 	return b.String(), nil
 }
 
-// formatMinutes prints the data value as is (60.8 stays 60.8).
+// formatMinutes prints whole minutes, rounded down so a warning never promises more time than the
+// data gives (60.8 -> 60).
 func formatMinutes(v *float64) string {
 	if v == nil {
 		return ""
 	}
-	return strconv.FormatFloat(*v, 'f', -1, 64)
+	return strconv.Itoa(int(math.Floor(*v)))
 }

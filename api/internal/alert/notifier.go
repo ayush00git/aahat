@@ -2,19 +2,27 @@ package alert
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"sync"
 )
 
-// Message is one warning to one phone.
+// Message is one warning to one recipient.
 type Message struct {
-	EventID        string `json:"event_id"`
-	SubscriptionID string `json:"subscription_id"`
-	To             string `json:"to"`
-	Channel        string `json:"channel"`
-	Lang           string `json:"lang"`
-	Text           string `json:"text"`
+	EventID        string          `json:"event_id"`
+	SubscriptionID string          `json:"subscription_id"`
+	To             string          `json:"to"`
+	Channel        string          `json:"channel"`
+	Lang           string          `json:"lang"`
+	Title          string          `json:"title"`
+	Text           string          `json:"text"`
+	Short          string          `json:"short,omitempty"` // SMS-length version of Text
+	AudioURL       string          `json:"audio_url,omitempty"`
+	LakeID         string          `json:"lake_id"`
+	PlaceOSM       string          `json:"place_osm"`
+	ArrivalMinFast *float64        `json:"arrival_min_fast,omitempty"`
+	Push           json.RawMessage `json:"-"` // browser PushSubscription for the webpush channel
 }
 
 // Notifier delivers a message over SMS, voice or WhatsApp. Implementations

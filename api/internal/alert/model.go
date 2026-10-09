@@ -3,6 +3,7 @@
 package alert
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -23,6 +24,7 @@ const (
 	ChannelSMS      = "sms"
 	ChannelVoice    = "voice"
 	ChannelWhatsApp = "whatsapp"
+	ChannelWebPush  = "webpush" // browser push to the villager web app
 
 	SourceSimulation = "simulation"
 	SourceSensor     = "sensor"
@@ -35,13 +37,15 @@ const (
 // Subscription asks for warnings about one place (an OSM settlement, school
 // or health facility) to be sent to one phone.
 type Subscription struct {
-	ID        string    `json:"id"`
-	PlaceOSM  string    `json:"place_osm"`
-	PlaceName string    `json:"place_name"`
-	Phone     string    `json:"phone"`
-	Lang      string    `json:"lang"`
-	Channel   string    `json:"channel"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string `json:"id"`
+	PlaceOSM  string `json:"place_osm"`
+	PlaceName string `json:"place_name"`
+	Phone     string `json:"phone"`
+	Lang      string `json:"lang"`
+	Channel   string `json:"channel"`
+	// Push is the browser's PushSubscription JSON for the webpush channel.
+	Push      json.RawMessage `json:"push_subscription,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 var (
@@ -57,7 +61,21 @@ func (s *Subscription) Normalize() error {
 	if !ValidOSM(s.PlaceOSM) {
 		return invalid("place_osm must look like node/123, way/123 or relation/123")
 	}
-	if !e164.MatchString(s.Phone) {
+	if s.Channel == "" {
+		s.Channel = ChannelSMS
+	}
+	if s.Channel == ChannelWebPush {
+		var push struct {
+			Endpoint string `json:"endpoint"`
+		}
+		if json.Unmarshal(s.Push, &push) != nil || push.Endpoint == "" {
+			return invalid("push_subscription with an endpoint is required for the webpush channel")
+		}
+	} else {
+		s.Push = nil
+	}
+	// A phone number is needed for SMS, voice and WhatsApp; optional for push.
+	if (s.Channel != ChannelWebPush || s.Phone != "") && !e164.MatchString(s.Phone) {
 		return invalid("phone must be in E.164 format, e.g. +919812345678")
 	}
 	if len(s.PlaceName) > 200 {
@@ -69,13 +87,10 @@ func (s *Subscription) Normalize() error {
 	if s.Lang != LangHindi && s.Lang != LangEnglish {
 		return invalid(`lang must be "hi" or "en"`)
 	}
-	if s.Channel == "" {
-		s.Channel = ChannelSMS
-	}
 	switch s.Channel {
-	case ChannelSMS, ChannelVoice, ChannelWhatsApp:
+	case ChannelSMS, ChannelVoice, ChannelWhatsApp, ChannelWebPush:
 	default:
-		return invalid(`channel must be "sms", "voice" or "whatsapp"`)
+		return invalid(`channel must be "sms", "voice", "whatsapp" or "webpush"`)
 	}
 	return nil
 }
@@ -117,9 +132,14 @@ type Recipient struct {
 	ArrivalMinFast     *float64 `json:"arrival_min_fast"`
 	ArrivalMinExpected *float64 `json:"arrival_min_expected"`
 	// Status is the place's overall status from impacts.json.
-	Status   string   `json:"status"`
-	Message  string   `json:"message"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Short   string `json:"short_message,omitempty"` // SMS-length version
+	// AudioURL is the message read out in the recipient's language (Polly), relative to the API root.
+	AudioURL string   `json:"audio_url,omitempty"`
 	Delivery Delivery `json:"delivery"`
+	// push carries the browser subscription to the dispatcher; never stored or returned.
+	push json.RawMessage
 }
 
 type Delivery struct {

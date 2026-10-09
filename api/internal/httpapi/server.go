@@ -21,6 +21,10 @@ type Config struct {
 	// OfficialAuth wraps the officials-only routes (subscriber lists,
 	// triggers, the alert log). Nil leaves them open.
 	OfficialAuth func(http.Handler) http.Handler
+	// PushPublicKey is the VAPID public key browsers subscribe with; empty disables /push/public-key.
+	PushPublicKey string
+	// AudioPath maps an /audio/{name} request to a file of spoken warnings; nil disables /audio.
+	AudioPath func(name string) string
 }
 
 type server struct {
@@ -29,6 +33,8 @@ type server struct {
 	alerts        *alert.Service
 	webhookSecret []byte
 	log           *slog.Logger
+	pushKey       string
+	audioPath     func(string) string
 }
 
 // New returns the API's root handler.
@@ -36,6 +42,7 @@ func New(cfg Config) http.Handler {
 	s := &server{
 		catalog: cfg.Catalog, store: cfg.Store, alerts: cfg.Alerts,
 		webhookSecret: cfg.WebhookSecret, log: cfg.Logger,
+		pushKey: cfg.PushPublicKey, audioPath: cfg.AudioPath,
 	}
 	if s.log == nil {
 		s.log = slog.New(slog.DiscardHandler)
@@ -64,6 +71,8 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /subscriptions", s.createSubscription)
 	// The random subscription id doubles as the unsubscribe token.
 	mux.HandleFunc("DELETE /subscriptions/{id}", s.deleteSubscription)
+	mux.HandleFunc("GET /push/public-key", s.pushPublicKey)
+	mux.HandleFunc("GET /audio/{name}", s.audio)
 
 	// Officials.
 	mux.Handle("GET /subscriptions", only(s.listSubscriptions))

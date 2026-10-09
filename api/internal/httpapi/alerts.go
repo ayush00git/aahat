@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/ayush00git/aahat/api/internal/alert"
 	"github.com/ayush00git/aahat/api/internal/data"
@@ -112,4 +114,34 @@ func (s *server) getEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, ev)
+}
+
+func (s *server) pushPublicKey(w http.ResponseWriter, _ *http.Request) {
+	if s.pushKey == "" {
+		writeError(w, http.StatusNotFound, "push notifications are not configured")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"key": s.pushKey})
+}
+
+// audio serves a spoken warning (Polly MP3) by its content-hash name.
+func (s *server) audio(w http.ResponseWriter, r *http.Request) {
+	if s.audioPath == nil {
+		writeError(w, http.StatusNotFound, "audio is not configured")
+		return
+	}
+	path := s.audioPath(r.PathValue("name"))
+	if path == "" {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", "audio/mpeg")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable") // the name is a content hash
+	http.ServeContent(w, r, "", time.Time{}, f)
 }

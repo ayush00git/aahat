@@ -53,11 +53,12 @@ func BuildPlan(lake data.Lake, scenario string, affected []data.Impact, subs []S
 			}
 			sent[key] = true
 
-			text, err := renderMessage(s.Lang, messageData{
+			md := messageData{
 				LakeName:       lakeLabel(s.Lang, lakeName(lake, s.Lang)),
 				PlaceName:      placeName(im, s),
 				ArrivalMinFast: formatMinutes(im.ArrivalMinFast),
-			})
+			}
+			text, err := renderMessage(s.Lang, md)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -71,7 +72,9 @@ func BuildPlan(lake data.Lake, scenario string, affected []data.Impact, subs []S
 				ArrivalMinFast: im.ArrivalMinFast, ArrivalMinExpected: im.ArrivalMinExpected,
 				Status:   im.Status,
 				Message:  text,
+				Short:    renderShort(s.Lang, md),
 				Delivery: Delivery{Status: DeliveryPending},
+				push:     s.Push,
 			})
 		}
 		place.Subscribers = len(sent)

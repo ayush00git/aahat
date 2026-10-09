@@ -1,5 +1,6 @@
-// Command server runs the Aahat API locally against the pipeline's output
-// directory, with a JSON-file store and a notifier that only logs.
+// Command server runs the Aahat API against the pipeline's output directory with a JSON-file
+// store (local development, or a single EC2 instance). Delivery channels come from the
+// environment, see app.Channels.
 package main
 
 import (
@@ -14,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ayush00git/aahat/api/internal/alert"
 	"github.com/ayush00git/aahat/api/internal/app"
 	"github.com/ayush00git/aahat/api/internal/data"
 	"github.com/ayush00git/aahat/api/internal/store"
@@ -44,12 +44,18 @@ func run(log *slog.Logger, addr, dataDir, storeFile string, cacheTTL time.Durati
 	if err != nil {
 		return err
 	}
+	notifier, speaker, pushKey, err := app.Channels(context.Background(), log, filepath.Dir(storeFile))
+	if err != nil {
+		return err
+	}
 	handler := app.Handler(app.Backends{
 		Data:          data.NewCache(local, cacheTTL),
 		Store:         st,
-		Notifier:      alert.NewLogNotifier(log),
+		Notifier:      notifier,
 		WebhookSecret: os.Getenv("AAHAT_WEBHOOK_SECRET"),
 		Logger:        log,
+		Voice:         speaker,
+		PushPublicKey: pushKey,
 	})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
