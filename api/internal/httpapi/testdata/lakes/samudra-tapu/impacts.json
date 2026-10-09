@@ -1,0 +1,114 @@
+[
+ {
+  "name": "Chhatru",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "hamlet",
+  "osm": "node/4547791440",
+  "lon": 77.365342,
+  "lat": 32.319454,
+  "km": 56.81,
+  "lateral_m": 44,
+  "arrival_min_expected": 118.8,
+  "arrival_min_fast": 95.0,
+  "scenarios": {
+   "expected": {
+    "status": "flooded",
+    "height_above_flood_m": 4.0,
+    "flood_depth_m": 7.0,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "flooded",
+    "height_above_flood_m": -3.4,
+    "flood_depth_m": 14.4,
+    "road_km_flooded": null
+   }
+  },
+  "status": "in_flood_path"
+ },
+ {
+  "name": "Koksar",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "hamlet",
+  "osm": "node/342116334",
+  "lon": 77.23389,
+  "lat": 32.41516,
+  "km": 76.1,
+  "lateral_m": 50,
+  "arrival_min_expected": 158.9,
+  "arrival_min_fast": 127.1,
+  "scenarios": {
+   "expected": {
+    "status": "margin",
+    "height_above_flood_m": 2.0,
+    "flood_depth_m": 6.5,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "flooded",
+    "height_above_flood_m": -8.2,
+    "flood_depth_m": 16.7,
+    "road_km_flooded": null
+   }
+  },
+  "status": "at_risk"
+ },
+ {
+  "name": "Yamling",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "village",
+  "osm": "node/11028063847",
+  "lon": 77.131448,
+  "lat": 32.478382,
+  "km": 90.18,
+  "lateral_m": 741,
+  "arrival_min_expected": 188.0,
+  "arrival_min_fast": 150.4,
+  "scenarios": {
+   "expected": {
+    "status": "outside",
+    "height_above_flood_m": 174.8,
+    "flood_depth_m": 6.0,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "outside",
+    "height_above_flood_m": 166.3,
+    "flood_depth_m": 14.5,
+    "road_km_flooded": null
+   }
+  },
+  "status": "outside"
+ },
+ {
+  "name": "Bhiyari",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "hamlet",
+  "osm": "node/8624123539",
+  "lon": 76.721678,
+  "lat": 32.668054,
+  "km": 146.5,
+  "lateral_m": 71,
+  "arrival_min_expected": 305.2,
+  "arrival_min_fast": 244.2,
+  "scenarios": {
+   "expected": {
+    "status": "margin",
+    "height_above_flood_m": 9.2,
+    "flood_depth_m": 2.7,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "margin",
+    "height_above_flood_m": 3.5,
+    "flood_depth_m": 8.4,
+    "road_km_flooded": null
+   }
+  },
+  "status": "at_risk"
+ }
+]

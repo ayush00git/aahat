@@ -1,0 +1,226 @@
+[
+ {
+  "name": "Manali-Leh",
+  "name_hi": null,
+  "kind": "road",
+  "subkind": "trunk",
+  "osm": "way/42020631",
+  "lon": 77.125888,
+  "lat": 32.481553,
+  "km": 11.53,
+  "lateral_m": 15,
+  "arrival_min_expected": 24.5,
+  "arrival_min_fast": 19.6,
+  "scenarios": {
+   "expected": {
+    "status": "flooded",
+    "height_above_flood_m": 14.9,
+    "flood_depth_m": 7.1,
+    "road_km_flooded": 0.1
+   },
+   "severe": {
+    "status": "flooded",
+    "height_above_flood_m": 5.0,
+    "flood_depth_m": 16.9,
+    "road_km_flooded": 0.21
+   }
+  },
+  "status": "in_flood_path"
+ },
+ {
+  "name": "Yamling",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "village",
+  "osm": "node/11028063847",
+  "lon": 77.131448,
+  "lat": 32.478382,
+  "km": 11.65,
+  "lateral_m": 605,
+  "arrival_min_expected": 24.5,
+  "arrival_min_fast": 19.6,
+  "scenarios": {
+   "expected": {
+    "status": "outside",
+    "height_above_flood_m": 123.3,
+    "flood_depth_m": 7.1,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "outside",
+    "height_above_flood_m": 113.4,
+    "flood_depth_m": 16.9,
+    "road_km_flooded": null
+   }
+  },
+  "status": "outside"
+ },
+ {
+  "name": "Thirot",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "hamlet",
+  "osm": "node/10928951156",
+  "lon": 76.777635,
+  "lat": 32.660759,
+  "km": 64.08,
+  "lateral_m": 105,
+  "arrival_min_expected": 133.9,
+  "arrival_min_fast": 107.1,
+  "scenarios": {
+   "expected": {
+    "status": "outside",
+    "height_above_flood_m": 14.2,
+    "flood_depth_m": 6.7,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "margin",
+    "height_above_flood_m": 3.4,
+    "flood_depth_m": 17.5,
+    "road_km_flooded": null
+   }
+  },
+  "status": "at_risk"
+ },
+ {
+  "name": "Bhiyari",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "hamlet",
+  "osm": "node/8624123539",
+  "lon": 76.721678,
+  "lat": 32.668054,
+  "km": 70.08,
+  "lateral_m": 71,
+  "arrival_min_expected": 146.4,
+  "arrival_min_fast": 117.1,
+  "scenarios": {
+   "expected": {
+    "status": "flooded",
+    "height_above_flood_m": 8.9,
+    "flood_depth_m": 7.8,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "flooded",
+    "height_above_flood_m": -1.2,
+    "flood_depth_m": 17.8,
+    "road_km_flooded": null
+   }
+  },
+  "status": "in_flood_path"
+ },
+ {
+  "name": "Lobar",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "hamlet",
+  "osm": "node/8624122591",
+  "lon": 76.667174,
+  "lat": 32.7201,
+  "km": 78.57,
+  "lateral_m": 122,
+  "arrival_min_expected": 164.1,
+  "arrival_min_fast": 131.2,
+  "scenarios": {
+   "expected": {
+    "status": "outside",
+    "height_above_flood_m": 10.2,
+    "flood_depth_m": 5.1,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "margin",
+    "height_above_flood_m": 3.1,
+    "flood_depth_m": 12.2,
+    "road_km_flooded": null
+   }
+  },
+  "status": "at_risk"
+ },
+ {
+  "name": "Government Senior Secondary School, Udaipur",
+  "name_hi": null,
+  "kind": "school",
+  "subkind": "school",
+  "osm": "node/809962485",
+  "lon": 76.664861,
+  "lat": 32.72383,
+  "km": 78.98,
+  "lateral_m": 252,
+  "arrival_min_expected": 164.6,
+  "arrival_min_fast": 131.7,
+  "scenarios": {
+   "expected": {
+    "status": "outside",
+    "height_above_flood_m": 17.5,
+    "flood_depth_m": 4.9,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "margin",
+    "height_above_flood_m": 9.8,
+    "flood_depth_m": 12.6,
+    "road_km_flooded": null
+   }
+  },
+  "status": "at_risk"
+ },
+ {
+  "name": "Kurched",
+  "name_hi": null,
+  "kind": "settlement",
+  "subkind": "hamlet",
+  "osm": "node/809944575",
+  "lon": 76.557157,
+  "lat": 32.759283,
+  "km": 93.18,
+  "lateral_m": 70,
+  "arrival_min_expected": 194.3,
+  "arrival_min_fast": 155.4,
+  "scenarios": {
+   "expected": {
+    "status": "margin",
+    "height_above_flood_m": 8.7,
+    "flood_depth_m": 4.8,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "margin",
+    "height_above_flood_m": 0.1,
+    "flood_depth_m": 13.3,
+    "road_km_flooded": null
+   }
+  },
+  "status": "at_risk"
+ },
+ {
+  "name": "Udaipur",
+  "name_hi": "उदयपुर",
+  "kind": "settlement",
+  "subkind": "town",
+  "osm": "node/10224069653",
+  "lon": 76.665209,
+  "lat": 32.725866,
+  "km": 78.95,
+  "lateral_m": 478,
+  "arrival_min_expected": 164.6,
+  "arrival_min_fast": 131.7,
+  "scenarios": {
+   "expected": {
+    "status": "outside",
+    "height_above_flood_m": 29.1,
+    "flood_depth_m": 4.9,
+    "road_km_flooded": null
+   },
+   "severe": {
+    "status": "outside",
+    "height_above_flood_m": 21.4,
+    "flood_depth_m": 12.6,
+    "road_km_flooded": null
+   }
+  },
+  "status": "outside"
+ }
+]

@@ -1,0 +1,111 @@
+{
+ "lake_id": "gepang-gath",
+ "as_of_season": 2026,
+ "volume_m3": 38707766,
+ "discharge": {
+  "scenarios": {
+   "expected": {
+    "peak_m3s": 7566,
+    "relation": "Qmax = 0.72 V^0.53",
+    "source": "Evans 1986, as tabulated in Huggel et al. 2002 (https://doi.org/10.1139/t01-099)",
+    "note": "closest to NRSC's HEC-RAS breach peak for Gepang Gath"
+   },
+   "severe": {
+    "peak_m3s": 40113,
+    "relation": "Qmax = 0.00077 V^1.017",
+    "source": "Huggel et al. 2002, Can. Geotech. J. 39:316-330 (https://doi.org/10.1139/t01-099)",
+    "note": "regression on moraine-dam outbursts of 0.09-19 million m³; extrapolated above that"
+   }
+  },
+  "all": {
+   "huggel2002": 40113,
+   "popov1991": 30193,
+   "evans1986": 7566
+  }
+ },
+ "path_km": 150.5,
+ "exposure_gaps_km": [],
+ "params": {
+  "res_m": 30.0,
+  "max_km": 150.0,
+  "window_m": 30000.0,
+  "station_m": 250.0,
+  "slope_window_m": 1000.0,
+  "section_half_m": 2000.0,
+  "min_slope": 0.002,
+  "manning_n": 0.06,
+  "attenuation_km": 42.4,
+  "corridor_m": 2000.0,
+  "speed_expected": 8.0,
+  "speed_fast": 10.0
+ },
+ "caveats": [
+  "Screening estimate: Manning normal depth on 30 m DEM cross-sections, no hydrodynamic routing.",
+  "Peak discharge from lake volume by empirical relations with large scatter; two scenarios shown.",
+  "The DEM (2011-2015) has no river bathymetry; flood levels near the river are approximate.",
+  "Arrival times assume a constant flood-front speed from observed Himalayan events.",
+  "Places missing from OpenStreetMap are missing here."
+ ],
+ "scenarios": {
+  "expected": [
+   {
+    "km": 0.0,
+    "lon": 77.20971,
+    "lat": 32.528356,
+    "bed_m": 4054.0,
+    "slope": 0.0795,
+    "discharge_m3s": 7566,
+    "wse_m": 4049.4,
+    "depth_m": 2.1,
+    "width_m": 150,
+    "arrival_min_expected": 0.0,
+    "arrival_min_fast": 0.0,
+    "section_capped": false
+   },
+   {
+    "km": 0.25,
+    "lon": 77.207859,
+    "lat": 32.528056,
+    "bed_m": 4027.3,
+    "slope": 0.0636,
+    "discharge_m3s": 7522,
+    "wse_m": 4036.1,
+    "depth_m": 7.1,
+    "width_m": 60,
+    "arrival_min_expected": 0.5,
+    "arrival_min_fast": 0.4,
+    "section_capped": false
+   }
+  ],
+  "severe": [
+   {
+    "km": 0.0,
+    "lon": 77.20971,
+    "lat": 32.528356,
+    "bed_m": 4054.0,
+    "slope": 0.0795,
+    "discharge_m3s": 40113,
+    "wse_m": 4055.2,
+    "depth_m": 7.9,
+    "width_m": 300,
+    "arrival_min_expected": 0.0,
+    "arrival_min_fast": 0.0,
+    "section_capped": false
+   },
+   {
+    "km": 0.25,
+    "lon": 77.207859,
+    "lat": 32.528056,
+    "bed_m": 4027.3,
+    "slope": 0.0636,
+    "discharge_m3s": 39877,
+    "wse_m": 4045.7,
+    "depth_m": 16.7,
+    "width_m": 120,
+    "arrival_min_expected": 0.5,
+    "arrival_min_fast": 0.4,
+    "section_capped": false
+   }
+  ]
+ }
+}

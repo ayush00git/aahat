@@ -1,0 +1,233 @@
+{
+ "generated_at": "2026-10-09T12:26:25+00:00",
+ "lakes": [
+  {
+   "id": "gepang-gath",
+   "name": "Gepang Gath",
+   "name_hi": "घेपन घाट झील",
+   "lat": 32.5237,
+   "lon": 77.2218,
+   "aoi_radius_m": 3000,
+   "district": "Lahaul and Spiti",
+   "basin": "Chandra (Chenab)",
+   "kind": "proglacial",
+   "notes": "Named among critical hotspots in the MHA GLOF review (Sept 2026) and among nine rapidly expanding lakes in the IIT Mandi study. Seed point located from 2025 Sentinel-2 imagery with `aahat discover`.",
+   "sources": [
+    "https://argusenglish.in/weather-calamities/195-glof-ticking-in-india-govt-pulls-up-socks-for-202730-risk-window-special-report",
+    "https://telanganatoday.com/iit-researchers-identify-nine-rapidly-expanding-glacial-lakes-in-himachal"
+   ],
+   "years": [
+    {
+     "year": 2025,
+     "status": "ok",
+     "area_m2": 1068800.0,
+     "uncertainty_m2": 40500.0,
+     "coverage": 0.997,
+     "scenes_clear": 10
+    },
+    {
+     "year": 2026,
+     "status": "ok",
+     "area_m2": 1085800.0,
+     "uncertainty_m2": 41100.0,
+     "coverage": 0.996,
+     "scenes_clear": 10
+    }
+   ],
+   "first": {
+    "year": 2017,
+    "status": "ok",
+    "area_m2": 858400.0,
+    "uncertainty_m2": 37500.0,
+    "coverage": 0.942,
+    "scenes_clear": 3
+   },
+   "latest": {
+    "year": 2026,
+    "status": "ok",
+    "area_m2": 1085800.0,
+    "uncertainty_m2": 41100.0,
+    "coverage": 0.996,
+    "scenes_clear": 10
+   },
+   "risk": {
+    "as_of_season": 2026,
+    "data_until": "2026-10-05",
+    "score": 61.6,
+    "level": "very_high",
+    "volume_m3": 38707766,
+    "peak_discharge_m3s": 40113
+   },
+   "downstream": {
+    "path_km": 150.5,
+    "peak_m3s": {
+     "expected": 7566,
+     "severe": 40113
+    },
+    "first_exposed": {
+     "name": "Manali-Leh",
+     "name_hi": null,
+     "kind": "road",
+     "subkind": "trunk",
+     "osm": "way/42020631",
+     "lon": 77.125888,
+     "lat": 32.481553,
+     "km": 11.53,
+     "lateral_m": 15,
+     "arrival_min_expected": 24.5,
+     "arrival_min_fast": 19.6,
+     "scenarios": null,
+     "status": "in_flood_path"
+    },
+    "first_settlement": {
+     "name": "Thirot",
+     "name_hi": null,
+     "kind": "settlement",
+     "subkind": "hamlet",
+     "osm": "node/10928951156",
+     "lon": 76.777635,
+     "lat": 32.660759,
+     "km": 64.08,
+     "lateral_m": 105,
+     "arrival_min_expected": 133.9,
+     "arrival_min_fast": 107.1,
+     "scenarios": null,
+     "status": "at_risk"
+    },
+    "exposed_counts": {
+     "road": {
+      "in_flood_path": 14,
+      "at_risk": 6
+     },
+     "bridge": {
+      "in_flood_path": 20,
+      "at_risk": 8
+     },
+     "hydro": {
+      "in_flood_path": 0,
+      "at_risk": 1
+     },
+     "settlement": {
+      "in_flood_path": 1,
+      "at_risk": 4
+     },
+     "school": {
+      "in_flood_path": 0,
+      "at_risk": 1
+     }
+    },
+    "exposure_gaps_km": []
+   }
+  },
+  {
+   "id": "samudra-tapu",
+   "name": "Samudra Tapu",
+   "name_hi": "समुद्र टापू झील",
+   "lat": 32.499,
+   "lon": 77.548,
+   "aoi_radius_m": 3000,
+   "district": "Lahaul and Spiti",
+   "basin": "Chandra (Chenab)",
+   "kind": "proglacial",
+   "notes": "Seed from OSM way 252201656 (Samudri Tapu).",
+   "sources": [
+    "https://argusenglish.in/weather-calamities/195-glof-ticking-in-india-govt-pulls-up-socks-for-202730-risk-window-special-report",
+    "https://www.openstreetmap.org/way/252201656"
+   ],
+   "years": [
+    {
+     "year": 2025,
+     "status": "ok",
+     "area_m2": 1626500.0,
+     "uncertainty_m2": 54300.0,
+     "coverage": 1.0,
+     "scenes_clear": 10
+    },
+    {
+     "year": 2026,
+     "status": "ok",
+     "area_m2": 1647000.0,
+     "uncertainty_m2": 56300.0,
+     "coverage": 0.992,
+     "scenes_clear": 10
+    }
+   ],
+   "first": {
+    "year": 2017,
+    "status": "partial",
+    "area_m2": 1334700.0,
+    "uncertainty_m2": 56900.0,
+    "coverage": 0.934,
+    "scenes_clear": 1
+   },
+   "latest": {
+    "year": 2026,
+    "status": "ok",
+    "area_m2": 1647000.0,
+    "uncertainty_m2": 56300.0,
+    "coverage": 0.992,
+    "scenes_clear": 10
+   },
+   "risk": {
+    "as_of_season": 2026,
+    "data_until": "2026-10-05",
+    "score": 62.0,
+    "level": "very_high",
+    "volume_m3": 69942033,
+    "peak_discharge_m3s": 73213
+   },
+   "downstream": {
+    "path_km": 150.5,
+    "peak_m3s": {
+     "expected": 10352,
+     "severe": 73213
+    },
+    "first_exposed": {
+     "name": "Kaza-Grampoo Road",
+     "name_hi": null,
+     "kind": "road",
+     "subkind": "trunk",
+     "osm": "way/819981973",
+     "lon": 77.61924,
+     "lat": 32.363136,
+     "km": 19.2,
+     "lateral_m": 44,
+     "arrival_min_expected": 40.1,
+     "arrival_min_fast": 32.1,
+     "scenarios": null,
+     "status": "in_flood_path"
+    },
+    "first_settlement": {
+     "name": "Chhatru",
+     "name_hi": null,
+     "kind": "settlement",
+     "subkind": "hamlet",
+     "osm": "node/4547791440",
+     "lon": 77.365342,
+     "lat": 32.319454,
+     "km": 56.81,
+     "lateral_m": 44,
+     "arrival_min_expected": 118.8,
+     "arrival_min_fast": 95.0,
+     "scenarios": null,
+     "status": "in_flood_path"
+    },
+    "exposed_counts": {
+     "road": {
+      "in_flood_path": 13,
+      "at_risk": 5
+     },
+     "bridge": {
+      "in_flood_path": 18,
+      "at_risk": 9
+     },
+     "settlement": {
+      "in_flood_path": 1,
+      "at_risk": 2
+     }
+    },
+    "exposure_gaps_km": []
+   }
+  }
+ ]
+}

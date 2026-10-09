@@ -1,0 +1,84 @@
+// Package httpapi is the Aahat HTTP API: lake data for the map, place lookups
+// for the villager app, subscriptions, triggers and the alert log.
+package httpapi
+
+import (
+	"log/slog"
+	"net/http"
+
+	"github.com/ayush00git/aahat/api/internal/alert"
+	"github.com/ayush00git/aahat/api/internal/data"
+	"github.com/ayush00git/aahat/api/internal/store"
+)
+
+type Config struct {
+	Catalog *data.Catalog
+	Store   store.Store
+	Alerts  *alert.Service
+	// WebhookSecret signs sensor webhooks. Empty disables the webhook.
+	WebhookSecret []byte
+	Logger        *slog.Logger
+	// OfficialAuth wraps the officials-only routes (subscriber lists,
+	// triggers, the alert log). Nil leaves them open.
+	OfficialAuth func(http.Handler) http.Handler
+}
+
+type server struct {
+	catalog       *data.Catalog
+	store         store.Store
+	alerts        *alert.Service
+	webhookSecret []byte
+	log           *slog.Logger
+}
+
+// New returns the API's root handler.
+func New(cfg Config) http.Handler {
+	s := &server{
+		catalog: cfg.Catalog, store: cfg.Store, alerts: cfg.Alerts,
+		webhookSecret: cfg.WebhookSecret, log: cfg.Logger,
+	}
+	if s.log == nil {
+		s.log = slog.New(slog.DiscardHandler)
+	}
+	official := cfg.OfficialAuth
+	if official == nil {
+		official = func(h http.Handler) http.Handler { return h }
+	}
+	only := func(h http.HandlerFunc) http.Handler { return official(h) }
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", s.health)
+
+	// Lake data (public, read-only).
+	mux.HandleFunc("GET /lakes", s.listLakes)
+	mux.HandleFunc("GET /lakes/{id}", s.getLake)
+	mux.HandleFunc("GET /lakes/{id}/risk", s.lakeFile("risk.json"))
+	mux.HandleFunc("GET /lakes/{id}/downstream", s.lakeFile("downstream.json"))
+	mux.HandleFunc("GET /lakes/{id}/impacts", s.lakeImpacts)
+	mux.HandleFunc("GET /lakes/{id}/layers/{name}", s.lakeLayer)
+
+	// Villager app.
+	mux.HandleFunc("GET /places/search", s.searchPlaces)
+	mux.HandleFunc("GET /places/{osm}/threats", s.placeThreats)        // osm URL-encoded: node%2F123
+	mux.HandleFunc("GET /places/{type}/{num}/threats", s.placeThreats) // or as two segments
+	mux.HandleFunc("POST /subscriptions", s.createSubscription)
+	// The random subscription id doubles as the unsubscribe token.
+	mux.HandleFunc("DELETE /subscriptions/{id}", s.deleteSubscription)
+
+	// Officials.
+	mux.Handle("GET /subscriptions", only(s.listSubscriptions))
+	mux.Handle("POST /trigger", only(s.trigger))
+	mux.Handle("GET /events", only(s.listEvents))
+	mux.Handle("GET /events/{id}", only(s.getEvent))
+
+	// Sensors authenticate with an HMAC signature instead.
+	mux.HandleFunc("POST /webhook/sensor", s.sensorWebhook)
+
+	mux.Handle("/", fallback(mux))
+
+	return recoverer(s.log, cors(mux))
+}
+
+func (s *server) health(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
