@@ -31,6 +31,9 @@ type Backends struct {
 	Logger        *slog.Logger
 	Voice         *voice.Polly // optional: spoken warnings
 	PushPublicKey string       // optional: VAPID public key for the web app
+	// OfficialToken, if set, is required as "Authorization: Bearer <token>" on officials' routes
+	// (trigger, subscriber list, alert log). Empty leaves them open (local development).
+	OfficialToken string
 }
 
 // Handler builds the API handler.
@@ -52,6 +55,7 @@ func Handler(b Backends) http.Handler {
 		Logger:        b.Logger,
 		PushPublicKey: b.PushPublicKey,
 		AudioPath:     audioPath,
+		OfficialAuth:  httpapi.BearerToken(b.OfficialToken),
 	})
 }
 
@@ -64,6 +68,7 @@ func Handler(b Backends) http.Handler {
 func FromEnv(ctx context.Context, log *slog.Logger) (Backends, error) {
 	b := Backends{
 		WebhookSecret: os.Getenv("AAHAT_WEBHOOK_SECRET"),
+		OfficialToken: os.Getenv("AAHAT_OFFICIAL_TOKEN"),
 		Logger:        log,
 	}
 	stateDir := os.Getenv("AAHAT_STATE_DIR")

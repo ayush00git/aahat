@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -59,4 +60,21 @@ func fallback(mux *http.ServeMux) http.Handler {
 		}
 		writeError(w, http.StatusNotFound, "not found")
 	})
+}
+
+// BearerToken guards officials' routes with a shared secret token; an empty token disables the check.
+func BearerToken(token string) func(http.Handler) http.Handler {
+	if token == "" {
+		return nil
+	}
+	want := []byte("Bearer " + token)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), want) != 1 {
+				writeError(w, http.StatusUnauthorized, "officials only: missing or wrong token")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

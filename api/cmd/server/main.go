@@ -56,6 +56,7 @@ func run(log *slog.Logger, addr, dataDir, storeFile string, cacheTTL time.Durati
 		Logger:        log,
 		Voice:         speaker,
 		PushPublicKey: pushKey,
+		OfficialToken: os.Getenv("AAHAT_OFFICIAL_TOKEN"),
 	})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}

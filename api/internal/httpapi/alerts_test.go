@@ -4,6 +4,8 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -235,4 +237,23 @@ func TestSensorWebhook(t *testing.T) {
 		env.handler = New(Config{Store: env.store}) // no WebhookSecret
 		expectError(t, env.do(t, "POST", "/webhook/sensor", body, "X-Aahat-Signature", sign("", body)), 503)
 	})
+}
+
+func TestBearerTokenGuardsOfficialRoutes(t *testing.T) {
+	guard := BearerToken("s3cret")
+	h := guard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	for header, want := range map[string]int{"": 401, "Bearer wrong": 401, "s3cret": 401, "Bearer s3cret": 204} {
+		req := httptest.NewRequest("POST", "/trigger", nil)
+		if header != "" {
+			req.Header.Set("Authorization", header)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Errorf("Authorization %q: got %d, want %d", header, rec.Code, want)
+		}
+	}
+	if BearerToken("") != nil {
+		t.Error("an empty token should disable the guard")
+	}
 }

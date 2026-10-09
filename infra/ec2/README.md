@@ -17,7 +17,8 @@ AAHAT_SMS=sns ./deploy.sh      # same, with SMS through Amazon SNS turned on
   `sudo tail -f /var/log/caddy-access.log`.
 - The API runs as user `aahat` with a JSON-file store in `/srv/aahat/state`, data in `/srv/aahat/data`,
   Polly MP3s in `/srv/aahat/state/audio`, and web push keys in `/srv/aahat/state/vapid.json`.
-- The sensor webhook secret is generated on the server at `/srv/aahat/webhook.secret`.
+- The sensor webhook secret is generated on the server at `/srv/aahat/webhook.secret`, and the officials'
+  token (needed for trigger, subscriber list and alert log; the dashboard asks for it) at `/srv/aahat/official.token`.
 - SMS via SNS starts in the sandbox: only verified numbers receive messages
   (`aws sns create-sms-sandbox-phone-number --phone-number +91...`, then `verify-sms-sandbox-phone-number`
   with the OTP), with a $1/month default spend limit.

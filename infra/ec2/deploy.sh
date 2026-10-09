@@ -39,7 +39,9 @@ done
 printf 'AWS_REGION=%s\nAAHAT_POLLY=1\nAAHAT_SMS=%s\n' "$AWS_REGION" "$AAHAT_SMS" | sudo tee /srv/aahat/api.env >/dev/null
 [ -f /srv/aahat/webhook.secret ] || openssl rand -hex 32 | sudo tee /srv/aahat/webhook.secret >/dev/null
 echo "AAHAT_WEBHOOK_SECRET=$(sudo cat /srv/aahat/webhook.secret)" | sudo tee -a /srv/aahat/api.env >/dev/null
-sudo chown -R aahat:aahat /srv/aahat && sudo chmod 600 /srv/aahat/api.env /srv/aahat/webhook.secret
+[ -f /srv/aahat/official.token ] || openssl rand -hex 16 | sudo tee /srv/aahat/official.token >/dev/null
+echo "AAHAT_OFFICIAL_TOKEN=$(sudo cat /srv/aahat/official.token)" | sudo tee -a /srv/aahat/api.env >/dev/null
+sudo chown -R aahat:aahat /srv/aahat && sudo chmod 600 /srv/aahat/api.env /srv/aahat/webhook.secret /srv/aahat/official.token
 sudo install -m 644 /tmp/aahat/Caddyfile /etc/caddy/Caddyfile
 sudo install -m 644 /tmp/aahat/aahat-api.service /etc/systemd/system/aahat-api.service
 sudo systemctl daemon-reload
@@ -48,3 +50,4 @@ sudo systemctl restart aahat-api && sudo systemctl reload caddy || sudo systemct
 sleep 1; curl -fsS 127.0.0.1:8080/health
 REMOTE
 echo "== live at https://$SITE_HOST  (officials: /officials, API: /api)"
+echo "   officials' token: $SSH sudo cat /srv/aahat/official.token"
