@@ -57,12 +57,20 @@ def lake_year(
     comp = composite(found, grid, terrain, p, max_scenes=max_scenes)
     used = comp.inputs
     if not used:
-        return LakeYear(lake.id, year, "no_data", None, None, None, None, len(found), 0, None, None, asdict(p)), None, None
+        return (
+            LakeYear(lake.id, year, "no_data", None, None, None, None, len(found), 0, None, None, asdict(p)),
+            None,
+            None,
+        )
     seed = point_in_crs(lake.lon, lake.lat, grid.crs)
     ext = extract_lake(comp, seed, p)
     days = (used[0].day.isoformat(), used[-1].day.isoformat())
     if ext is None:
-        return LakeYear(lake.id, year, "not_found", None, None, None, None, len(found), len(used), *days, asdict(p)), comp, None
+        return (
+            LakeYear(lake.id, year, "not_found", None, None, None, None, len(found), len(used), *days, asdict(p)),
+            comp,
+            None,
+        )
     # partial: the lake was not fully observed, or the season had fewer clear scenes than p.min_obs
     status = "ok" if ext.coverage >= 0.9 and len(used) >= p.min_obs else "partial"
     rec = LakeYear(
@@ -124,10 +132,18 @@ def run_lake(
 
 
 def build_index(out_dir: Path) -> dict:
-    """Collect every lake's series.json into lakes/index.json, the file the API and maps read."""
+    """Collect every lake's series.json into lakes/index.json, the file the API and maps read,
+    and each lake's yearly outlines into one <lake>/outlines.geojson for the growth time-lapse."""
     lakes = []
     for path in sorted((out_dir / "lakes").glob("*/series.json")):
         s = json.loads(path.read_text())
+        outlines = [
+            json.loads((path.parent / f"{r['year']}.geojson").read_text())
+            for r in s["years"]
+            if (path.parent / f"{r['year']}.geojson").exists()
+        ]
+        fc = {"type": "FeatureCollection", "features": outlines}
+        (path.parent / "outlines.geojson").write_text(json.dumps(fc, ensure_ascii=False))
         years = [
             {k: r[k] for k in ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear")}
             for r in s["years"]

@@ -17,9 +17,13 @@ def test_build_index_picks_first_and_latest_measured_years(tmp_path):
         ],
     }
     (lake_dir / "series.json").write_text(json.dumps(series))
+    for year in (2018, 2019):
+        (lake_dir / f"{year}.geojson").write_text(json.dumps({"type": "Feature", "properties": {"year": year}}))
     index = build_index(tmp_path)
     lake = index["lakes"][0]
     assert lake["first"]["year"] == 2018
     assert lake["latest"]["year"] == 2019
     assert len(lake["years"]) == 4
     assert (tmp_path / "lakes" / "index.json").exists()
+    outlines = json.loads((lake_dir / "outlines.geojson").read_text())
+    assert [f["properties"]["year"] for f in outlines["features"]] == [2018, 2019]
