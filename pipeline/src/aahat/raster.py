@@ -24,6 +24,11 @@ GDAL_ENV = {
     "GDAL_HTTP_MULTIRANGE": "YES",
     "GDAL_HTTP_MERGE_CONSECUTIVE_RANGES": "YES",
     "VSI_CACHE": "TRUE",
+    # Without these a stalled connection hangs forever; fail fast and let the retry loop take over.
+    "GDAL_HTTP_CONNECTTIMEOUT": "20",
+    "GDAL_HTTP_TIMEOUT": "120",
+    "GDAL_HTTP_LOW_SPEED_TIME": "30",
+    "GDAL_HTTP_LOW_SPEED_LIMIT": "2000",
 }
 
 
@@ -33,14 +38,20 @@ def read_to_grid(
     resampling: Resampling = Resampling.bilinear,
     dtype: str = "float32",
     nodata: float | None = None,
-    attempts: int = 4,
+    attempts: int = 7,
 ) -> np.ndarray:
-    """Warp one band of a remote raster onto `grid`. Pixels outside the source are NaN (or 0 for ints)."""
+    """Warp one band of a raster (remote URL or local path) onto `grid`.
+
+    Pixels outside the source are NaN (or 0 for ints).
+    """
     fill = np.nan if np.dtype(dtype).kind == "f" else 0
     last_err: Exception | None = None
     for attempt in range(attempts):
+        # GDAL caches byte ranges per URL, including a truncated block from a dropped connection.
+        # A throwaway query parameter (ignored by S3) makes each retry a fresh, uncached read.
+        url = href if attempt == 0 or "://" not in href else f"{href}{'&' if '?' in href else '?'}retry={attempt}"
         try:
-            with rasterio.Env(**GDAL_ENV), rasterio.open(href) as src:
+            with rasterio.Env(**GDAL_ENV), rasterio.open(url) as src:
                 src_nodata = src.nodata if nodata is None else nodata
                 with WarpedVRT(
                     src,
@@ -57,7 +68,7 @@ def read_to_grid(
             return out
         except rasterio.errors.RasterioIOError as e:  # flaky network: back off and retry
             last_err = e
-            wait = 2**attempt
+            wait = min(2**attempt, 30)
             log.warning("read failed (%s), retry %d in %ds: %s", href.rsplit("/", 1)[-1], attempt + 1, wait, e)
             time.sleep(wait)
     raise RuntimeError(f"could not read {href}") from last_err

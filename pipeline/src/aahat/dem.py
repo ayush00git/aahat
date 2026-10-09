@@ -8,6 +8,7 @@ import numpy as np
 from rasterio.enums import Resampling
 from rasterio.warp import reproject
 
+from .cache import cached_file
 from .geo import Grid
 from .raster import read_to_grid
 
@@ -31,10 +32,17 @@ def tiles_for(grid: Grid) -> list[str]:
 
 
 def read_dem(grid: Grid) -> np.ndarray:
-    """Elevation (m, EGM2008) on `grid`, mosaicking 1x1 degree tiles as needed."""
+    """Elevation (m, EGM2008) on `grid`, mosaicking 1x1 degree tiles as needed.
+
+    Whole tiles are cached on local disk: they are reused across lakes and for downstream routing.
+    Tiles that do not exist (open water, no coverage) are skipped.
+    """
     out = np.full(grid.shape, np.nan, dtype="float32")
     for href in tiles_for(grid):
-        part = read_to_grid(href, grid, Resampling.bilinear)
+        path = cached_file(href)
+        if path is None:
+            continue
+        part = read_to_grid(str(path), grid, Resampling.bilinear)
         fill = np.isnan(out) & ~np.isnan(part)
         out[fill] = part[fill]
     return out
