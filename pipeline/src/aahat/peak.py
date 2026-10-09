@@ -53,7 +53,8 @@ RELATIONS: dict[str, Relation] = {
             0.72,
             0.53,
             "Evans 1986, as tabulated in Huggel et al. 2002 (https://doi.org/10.1139/t01-099)",
-            "closest to NRSC's HEC-RAS breach peak for Gepang Gath",
+            "used as the expected case: of the relations, it came closest to NRSC's HEC-RAS dam-breach peak "
+            "for the benchmark lake, Gepang Gath",
         ),
     )
 }

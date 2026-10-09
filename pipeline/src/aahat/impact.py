@@ -192,6 +192,7 @@ def run_downstream(lake_dir) -> dict:
     (per-scenario stations and discharge, caveats), flood_path.geojson, corridor_<scenario>.geojson, impacts.json."""
     import json
 
+    import shapely
     from shapely.geometry import mapping, shape
 
     from .downstream import compute_scenarios, path_geojson
@@ -214,7 +215,7 @@ def run_downstream(lake_dir) -> dict:
         "discharge": peak,
         "path_km": first.stations[-1].km if first.stations else 0,
         "exposure_gaps_km": gaps,  # stretches where OpenStreetMap could not be fetched: rerun to fill
-        "params": first.params,
+        "params": first.params | {"margin_height_m": MARGIN_HEIGHT_M, "margin_distance_m": MARGIN_DISTANCE_M},
         "caveats": [
             "Screening estimate: Manning normal depth on 30 m DEM cross-sections, no hydrodynamic routing.",
             "Peak discharge from lake volume by empirical relations with large scatter; two scenarios shown.",
@@ -227,7 +228,9 @@ def run_downstream(lake_dir) -> dict:
     (lake_dir / "downstream.json").write_text(json.dumps(out, ensure_ascii=False))
     (lake_dir / "flood_path.geojson").write_text(json.dumps(path_geojson(first)))
     for name, d in ds.items():
-        corridor = {"type": "Feature", "geometry": mapping(d.corridor), "properties": {"scenario": name}}
+        # ~1 m coordinate precision: the files are for maps on slow phones, not for analysis
+        geom = shapely.set_precision(d.corridor, 1e-5)
+        corridor = {"type": "Feature", "geometry": mapping(geom), "properties": {"scenario": name}}
         (lake_dir / f"corridor_{name}.geojson").write_text(json.dumps(corridor))
     (lake_dir / "impacts.json").write_text(json.dumps(rows, ensure_ascii=False))
     return out | {"impacts": rows}
