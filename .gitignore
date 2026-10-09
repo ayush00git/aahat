@@ -25,3 +25,7 @@ cdk.out/
 
 # go
 api/aahat-server
+
+# infra
+infra/ec2/.state
+api/bin/

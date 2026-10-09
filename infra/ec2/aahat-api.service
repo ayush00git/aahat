@@ -1,0 +1,10 @@
+[Unit]
+Description=Aahat API
+After=network-online.target
+[Service]
+User=aahat
+EnvironmentFile=/srv/aahat/api.env
+ExecStart=/srv/aahat/bin/aahat-server -addr 127.0.0.1:8080 -data /srv/aahat/data -store /srv/aahat/state/store.json
+Restart=on-failure
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+{$SITE_HOST} {
+	encode zstd gzip
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle_path /officials* {
+		root * /srv/aahat/web/dashboard
+		try_files {path} /index.html
+		file_server
+	}
+	handle {
+		root * /srv/aahat/web/villager
+		try_files {path} /index.html
+		file_server
+	}
+	log {
+		output file /var/log/caddy-access.log
+	}
+}
