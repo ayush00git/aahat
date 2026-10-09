@@ -120,3 +120,26 @@ def run_lake(
 
             save_quicklook(comp, ext, lake_dir / f"{year}.png", title=f"{lake.name} {year}")
     return records
+
+
+def build_index(out_dir: Path) -> dict:
+    """Collect every lake's series.json into lakes/index.json, the file the API and maps read."""
+    lakes = []
+    for path in sorted((out_dir / "lakes").glob("*/series.json")):
+        s = json.loads(path.read_text())
+        years = [
+            {k: r[k] for k in ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear")}
+            for r in s["years"]
+        ]
+        measured = [r for r in years if r["area_m2"] is not None]
+        lakes.append(
+            s["lake"]
+            | {
+                "years": years,
+                "first": measured[0] if measured else None,
+                "latest": measured[-1] if measured else None,
+            }
+        )
+    index = {"generated_at": datetime.now(UTC).isoformat(timespec="seconds"), "lakes": lakes}
+    (out_dir / "lakes" / "index.json").write_text(json.dumps(index, indent=1, ensure_ascii=False))
+    return index

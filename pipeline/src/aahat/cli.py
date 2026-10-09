@@ -14,7 +14,7 @@ from shapely.geometry import Point
 from .dem import Terrain
 from .geo import grid_around, to_wgs84
 from .lakes import get_lake, load_lakes
-from .timeseries import FIRST_YEAR, run_lake, season
+from .timeseries import FIRST_YEAR, build_index, run_lake, season
 from .water import WaterParams, composite
 
 
@@ -36,6 +36,22 @@ def cmd_series(args) -> None:
             unc = f"{r.uncertainty_m2 / 1e6:.4f}" if r.uncertainty_m2 else "-"
             cov = f"{r.coverage:.0%}" if r.coverage is not None else "-"
             print(f"{r.year:>6} {r.status:>10} {area:>10} {unc:>8} {cov:>6} {r.scenes_clear:>3}/{r.scenes_found:<3}")
+
+
+def cmd_summary(args) -> None:
+    index = build_index(Path(args.out))
+    years = sorted({r["year"] for lake in index["lakes"] for r in lake["years"]})
+    print(f"{'lake':<16}" + "".join(f"{y:>8}" for y in years) + "   (km2; * partial, - not found/no data)")
+    for lake in index["lakes"]:
+        by_year = {r["year"]: r for r in lake["years"]}
+        cells = []
+        for y in years:
+            r = by_year.get(y)
+            if r is None or r["area_m2"] is None:
+                cells.append(f"{'-':>8}")
+            else:
+                cells.append(f"{r['area_m2'] / 1e6:>7.3f}" + ("*" if r["status"] == "partial" else " "))
+        print(f"{lake['id']:<16}" + "".join(cells))
 
 
 def cmd_discover(args) -> None:
@@ -82,6 +98,10 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--max-scenes", type=int, default=12)
     s.add_argument("--quicklook", action="store_true")
     s.set_defaults(func=cmd_series)
+
+    m = sub.add_parser("summary", help="table of all lake series; writes lakes/index.json")
+    m.add_argument("--out", default="out")
+    m.set_defaults(func=cmd_summary)
 
     d = sub.add_parser("discover", help="list water bodies around a point")
     d.add_argument("--lat", type=float, required=True)
