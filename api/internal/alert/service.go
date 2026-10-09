@@ -39,6 +39,7 @@ type TriggerRequest struct {
 	Scenario string
 	Source   string
 	Note     string
+	DryRun   bool // build, log and voice the plan, but send nothing (drills)
 	Sensor   *SensorReading
 }
 
@@ -85,7 +86,7 @@ func (s *Service) Trigger(ctx context.Context, req TriggerRequest) (*Event, erro
 
 	ev := &Event{
 		ID: s.NewID("evt"), LakeID: lake.ID, LakeName: lake.Name, LakeNameHi: lake.NameHi,
-		Scenario: req.Scenario, Source: req.Source, Note: req.Note, Sensor: req.Sensor,
+		Scenario: req.Scenario, Source: req.Source, Note: req.Note, Sensor: req.Sensor, DryRun: req.DryRun,
 		CreatedAt: s.Now().UTC(), Recipients: recipients, AffectedPlaces: places,
 		Summary: summarize(recipients),
 	}

@@ -114,3 +114,18 @@ func TestDispatcherSynthesizesEachDistinctMessageOnce(t *testing.T) {
 		t.Errorf("audio urls not set: %+v", ev.Recipients)
 	}
 }
+
+func TestDryRunVoicesButSendsNothing(t *testing.T) {
+	n := NewLogNotifier(nil)
+	v := &fakeVoice{}
+	d := NewDispatcher(n)
+	d.Voice = v
+	ev := &Event{ID: "evt_4", DryRun: true, Recipients: []Recipient{{SubscriptionID: "a", Lang: "hi", Channel: "sms", Message: "x"}}}
+	d.Dispatch(context.Background(), ev)
+	if len(n.Sent()) != 0 || ev.Recipients[0].Delivery.Status != DeliveryDryRun || ev.Recipients[0].AudioURL == "" {
+		t.Errorf("sent=%d recipient=%+v", len(n.Sent()), ev.Recipients[0])
+	}
+	if ev.Summary.Sent != 0 || ev.Summary.Recipients != 1 {
+		t.Errorf("summary %+v", ev.Summary)
+	}
+}

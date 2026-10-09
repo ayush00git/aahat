@@ -40,6 +40,11 @@ func (d *Dispatcher) Dispatch(ctx context.Context, ev *Event) {
 			}
 			r.AudioURL = audio[key]
 		}
+		if ev.DryRun {
+			at := d.Now().UTC()
+			r.Delivery = Delivery{Status: DeliveryDryRun, At: &at}
+			continue
+		}
 		err := d.Notifier.Send(ctx, Message{
 			EventID: ev.ID, SubscriptionID: r.SubscriptionID,
 			To: r.Phone, Channel: r.Channel, Lang: r.Lang,

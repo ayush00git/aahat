@@ -32,6 +32,7 @@ const (
 	DeliveryPending = "pending"
 	DeliverySent    = "sent"
 	DeliveryFailed  = "failed"
+	DeliveryDryRun  = "dry_run" // a drill: planned and voiced, not sent
 )
 
 // Subscription asks for warnings about one place (an OSM settlement, school
@@ -114,6 +115,7 @@ type Event struct {
 	Scenario       string          `json:"scenario"`
 	Source         string          `json:"source"`
 	Note           string          `json:"note,omitempty"`
+	DryRun         bool            `json:"dry_run"`
 	Sensor         *SensorReading  `json:"sensor,omitempty"`
 	CreatedAt      time.Time       `json:"created_at"`
 	Recipients     []Recipient     `json:"recipients"`

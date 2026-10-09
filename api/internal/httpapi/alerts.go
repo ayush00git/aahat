@@ -22,12 +22,13 @@ func (s *server) trigger(w http.ResponseWriter, r *http.Request) {
 		Scenario string `json:"scenario"`
 		Source   string `json:"source"`
 		Note     string `json:"note"`
+		DryRun   bool   `json:"dry_run"`
 	}
 	if !readJSON(w, r, &in) {
 		return
 	}
 	s.runTrigger(w, r, alert.TriggerRequest{
-		LakeID: in.LakeID, Scenario: in.Scenario, Source: in.Source, Note: in.Note,
+		LakeID: in.LakeID, Scenario: in.Scenario, Source: in.Source, Note: in.Note, DryRun: in.DryRun,
 	})
 }
 
