@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass
 
+import numpy as np
 from rasterio import features
 from scipy import ndimage
 from shapely.geometry import Point, mapping, shape
@@ -34,6 +35,8 @@ class TerrainParams:
     steep_deg: float = 30.0
     run_m: float = 1000.0
     above_lake_m: float = 10.0
+    spill_candidates: int = 40
+    fall_m: float = 2.0  # a path that drops less than this over run_m means no surface outlet
 
 
 @dataclass
@@ -69,12 +72,23 @@ def lake_terrain(outline_wgs84: dict | object, p: TerrainParams = TerrainParams(
     level = water_level(dem, lake)
     lake = spill_mask(dem, lake, grid.res)
 
-    r0, c0 = outlet_cell(dem, lake)
-    path = flow_path(dem, (r0, c0), grid.res, max_length_m=p.run_m, blocked=lake)
+    # Spill point: of the lowest shore cells, the one whose downhill path has dropped the
+    # most after `run_m`, i.e. where water actually drains away. (The single lowest shore cell can
+    # be a DEM dip, e.g. a pit on the glacier surface beside a proglacial lake.)
+    ring = ndimage.binary_dilation(lake, structure=np.ones((3, 3))) & ~lake & np.isfinite(dem)
+    rr, cc = np.nonzero(ring)
+    order = np.argsort(dem[rr, cc])[: p.spill_candidates]
+    best_drop, path = -np.inf, [outlet_cell(dem, lake)]
+    for i in order:
+        cand = flow_path(dem, (int(rr[i]), int(cc[i])), grid.res, max_length_m=p.run_m, blocked=lake)
+        drop = level - dem[cand[-1]]
+        if drop > best_drop:
+            best_drop, path = drop, cand
+    surface_outlet = best_drop > p.fall_m
+    r0, c0 = path[0]
     run = float(path_length_m(path, grid.res)[-1])
     drop = float(level - dem[path[-1]])
-    surface_outlet = drop > 2.0
-    outlet_slope = math.degrees(math.atan2(drop, run)) if run > 0 and surface_outlet else 0.0
+    outlet_slope = math.degrees(math.atan2(drop, run)) if surface_outlet and run > 0 else 0.0
 
     slope = slope_deg(dem, grid.res)
     dist = ndimage.distance_transform_edt(~lake) * grid.res
@@ -95,7 +109,7 @@ def lake_terrain(outline_wgs84: dict | object, p: TerrainParams = TerrainParams(
         outlet_run_m=round(run, 1),
         outlet_drop_m=round(drop, 1),
         outlet_slope_deg=round(outlet_slope, 2),
-        surface_outlet=surface_outlet,
+        surface_outlet=bool(surface_outlet),
         steep_area_km2=round(float(steep.sum()) * cell_km2, 4),
         steep_share=round(float(steep.sum() / max(zone.sum(), 1)), 4),
         outlet_path=[lonlat(rc) for rc in path],

@@ -159,12 +159,20 @@ def build_index(out_dir: Path) -> dict:
             for r in s["years"]
         ]
         measured = [r for r in years if r["area_m2"] is not None]
+        risk_path = path.parent / "risk.json"
+        latest_risk = json.loads(risk_path.read_text()).get("latest") if risk_path.exists() else None
+        risk = (
+            {k: latest_risk[k] for k in ("as_of_season", "data_until", "score", "level", "volume_m3", "peak_discharge_m3s")}
+            if latest_risk
+            else None
+        )
         lakes.append(
             s["lake"]
             | {
                 "years": years,
                 "first": measured[0] if measured else None,
                 "latest": measured[-1] if measured else None,
+                "risk": risk,
             }
         )
     index = {"generated_at": datetime.now(UTC).isoformat(timespec="seconds"), "lakes": lakes}

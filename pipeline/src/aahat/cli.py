@@ -38,6 +38,19 @@ def cmd_series(args) -> None:
             print(f"{r.year:>6} {r.status:>10} {area:>10} {unc:>8} {cov:>6} {r.scenes_clear:>3}/{r.scenes_found:<3}")
 
 
+def cmd_risk(args) -> None:
+    from .risk import run_risk
+
+    lakes = load_lakes() if args.lake == "all" else [get_lake(args.lake)]
+    for lake in lakes:
+        out = run_risk(Path(args.out) / "lakes" / lake.id)
+        print(f"\n{lake.name}: replay (season -> score, level)")
+        for r in out["replay"]:
+            parts = ", ".join(f"{f['key']} {f['contribution']:.0f}" for f in r["factors"])
+            print(f"  {r['as_of_season']}  {r['score']:5.1f}  {r['level']:<9}  [{parts}]")
+    build_index(Path(args.out))
+
+
 def cmd_summary(args) -> None:
     index = build_index(Path(args.out))
     years = sorted({r["year"] for lake in index["lakes"] for r in lake["years"]})
@@ -98,6 +111,11 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--max-scenes", type=int, default=12)
     s.add_argument("--quicklook", action="store_true")
     s.set_defaults(func=cmd_series)
+
+    k = sub.add_parser("risk", help="hazard score replay for a lake (needs its series first)")
+    k.add_argument("--lake", required=True, help="lake id from the catalogue, or 'all'")
+    k.add_argument("--out", default="out")
+    k.set_defaults(func=cmd_risk)
 
     m = sub.add_parser("summary", help="table of all lake series; writes lakes/index.json")
     m.add_argument("--out", default="out")
