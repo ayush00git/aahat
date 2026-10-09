@@ -55,6 +55,27 @@ def cmd_risk(args) -> None:
     build_index(Path(args.out))
 
 
+def cmd_downstream(args) -> None:
+    from .impact import run_downstream
+
+    lakes = load_lakes() if args.lake == "all" else [get_lake(args.lake)]
+    for lake in lakes:
+        out = run_downstream(Path(args.out) / "lakes" / lake.id)
+        sc = out["discharge"]["scenarios"]
+        print(
+            f"\n{lake.name}: breach peak {sc['expected']['peak_m3s']:,} (expected) / {sc['severe']['peak_m3s']:,} m3/s"
+            f" (severe), path {out['path_km']:.0f} km"
+        )
+        for r in out["impacts"]:
+            if r["status"] != "outside" and r["kind"] != "road":
+                name = r["name"] or f"unnamed {r['subkind']}"
+                print(
+                    f"  {r['km']:6.1f} km  {r['arrival_min_fast']:4.0f}-{r['arrival_min_expected']:4.0f} min"
+                    f"  {r['status']:13} {r['kind']:<10} {name}"
+                )
+    build_index(Path(args.out))
+
+
 def cmd_summary(args) -> None:
     index = build_index(Path(args.out))
     years = sorted({r["year"] for lake in index["lakes"] for r in lake["years"]})
@@ -122,6 +143,11 @@ def main(argv: list[str] | None = None) -> None:
     k.add_argument("--lake", required=True, help="lake id from the catalogue, or 'all'")
     k.add_argument("--out", default="out")
     k.set_defaults(func=cmd_risk)
+
+    w = sub.add_parser("downstream", help="flood path, corridor, arrival times and exposed assets (needs risk first)")
+    w.add_argument("--lake", required=True, help="lake id from the catalogue, or 'all'")
+    w.add_argument("--out", default="out")
+    w.set_defaults(func=cmd_downstream)
 
     m = sub.add_parser("summary", help="table of all lake series; writes lakes/index.json")
     m.add_argument("--out", default="out")

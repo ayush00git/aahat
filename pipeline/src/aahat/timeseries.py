@@ -161,6 +161,7 @@ def build_index(out_dir: Path) -> dict:
             for r in s["years"]
         ]
         measured = [r for r in years if r["area_m2"] is not None]
+        downstream = _downstream_summary(path.parent)
         risk_path = path.parent / "risk.json"
         latest_risk = json.loads(risk_path.read_text()).get("latest") if risk_path.exists() else None
         risk = (
@@ -178,8 +179,31 @@ def build_index(out_dir: Path) -> dict:
                 "first": measured[0] if measured else None,
                 "latest": measured[-1] if measured else None,
                 "risk": risk,
+                "downstream": downstream,
             }
         )
     index = {"generated_at": datetime.now(UTC).isoformat(timespec="seconds"), "lakes": lakes}
     (out_dir / "lakes" / "index.json").write_text(json.dumps(index, indent=1, ensure_ascii=False))
     return index
+
+
+def _downstream_summary(lake_dir: Path) -> dict | None:
+    """Headline downstream numbers for the index: what is hit first and how many places are exposed."""
+    d_path, i_path = lake_dir / "downstream.json", lake_dir / "impacts.json"
+    if not (d_path.exists() and i_path.exists()):
+        return None
+    d = json.loads(d_path.read_text())
+    rows = json.loads(i_path.read_text())
+    exposed = [r for r in rows if r["status"] != "outside"]
+    counts: dict[str, dict[str, int]] = {}
+    for r in exposed:
+        counts.setdefault(r["kind"], {"in_flood_path": 0, "at_risk": 0})[r["status"]] += 1
+    first_settlement = next((r for r in exposed if r["kind"] == "settlement"), None)
+    return {
+        "path_km": d["path_km"],
+        "peak_m3s": {k: v["peak_m3s"] for k, v in d["discharge"]["scenarios"].items()},
+        "first_exposed": exposed[0] | {"scenarios": None} if exposed else None,
+        "first_settlement": first_settlement | {"scenarios": None} if first_settlement else None,
+        "exposed_counts": counts,
+        "exposure_gaps_km": d.get("exposure_gaps_km", []),
+    }

@@ -17,7 +17,7 @@ def test_normal_depth_matches_rectangular_channel_formula():
     depth, slope, n = 5.0, 0.01, 0.07
     area, perim = width * depth, width + 2 * depth
     q = area * (area / perim) ** (2 / 3) * math.sqrt(slope) / n
-    wse, top, capped = normal_depth_wse(offsets, ground, q, slope, n)
+    wse, _, capped = normal_depth_wse(offsets, ground, q, slope, n)
     assert abs(wse - depth) < 0.3
     assert not capped
 
@@ -63,14 +63,26 @@ def test_assess_flags_flooded_margin_and_outside_assets_in_arrival_order():
         for km in np.arange(0, 8.25, 0.25)
     ]
     corridor_utm = box(x0, y0 - 100, x0 + 8000, y0 + 100)  # flood level 1010 m -> 100 m either side
-    d = Downstream(crs.to_string(), path, stations, to_wgs84(corridor_utm, crs), {"corridor_m": 2000}, {}, grid, dem, None)
+    d = Downstream(
+        crs.to_string(), path, stations, to_wgs84(corridor_utm, crs), {"corridor_m": 2000}, {}, grid, dem, None
+    )
 
     def asset(kind, geom, name):
-        return Asset("node", hash(name) % 10_000, kind, "village" if kind == "settlement" else "road_bridge", name, None, to_wgs84(geom, crs))
+        return Asset(
+            "node",
+            hash(name) % 10_000,
+            kind,
+            "village" if kind == "settlement" else "road_bridge",
+            name,
+            None,
+            to_wgs84(geom, crs),
+        )
 
     assets = [
         asset("settlement", Point(x0 + 6000, y0 + 50), "low village"),  # 5 m above river, inside corridor
-        asset("settlement", Point(x0 + 2000, y0 + 150), "terrace village"),  # ground 1015 m: 5 m above the flood, 50 m out
+        asset(
+            "settlement", Point(x0 + 2000, y0 + 150), "terrace village"
+        ),  # ground 1015 m: 5 m above the flood, 50 m out
         asset("settlement", Point(x0 + 4000, y0 + 1500), "high village"),  # +150 m
         asset("bridge", LineString([(x0 + 3000, y0 - 150), (x0 + 3000, y0 + 150)]), "bridge"),
         asset("settlement", Point(x0 + 4000, y0 + 9000), "far away"),
@@ -84,3 +96,26 @@ def test_assess_flags_flooded_margin_and_outside_assets_in_arrival_order():
     assert by["terrace village"].status == "margin"  # within 10 m above the flood and 300 m of the corridor
     assert [i.name for i in out] == ["terrace village", "bridge", "high village", "low village"]  # by km
     assert by["bridge"].arrival_min_fast < by["low village"].arrival_min_fast
+
+
+def test_merge_scenarios_summary_status():
+    from aahat.impact import Impact, merge_scenarios
+
+    def imp(osm, km, status):
+        return Impact("v", None, "settlement", "village", osm, 0, 0, km, 0, 1.0, 5.0, 10, 8, status)
+
+    rows = merge_scenarios(
+        {
+            "expected": [imp("node/1", 5, "flooded"), imp("node/2", 3, "outside"), imp("node/3", 9, "outside")],
+            "severe": [imp("node/1", 5, "flooded"), imp("node/2", 3, "flooded"), imp("node/3", 9, "outside")],
+        }
+    )
+    assert [r["osm"] for r in rows] == ["node/2", "node/1", "node/3"]  # by km
+    assert [r["status"] for r in rows] == ["at_risk", "in_flood_path", "outside"]
+    assert rows[0]["scenarios"]["severe"]["status"] == "flooded"
+
+
+def test_attenuation_halves_after_about_29_km():
+    from aahat.downstream import discharge_at
+
+    assert abs(discharge_at(42.4 * math.log(2), 1000, 42.4) - 500) < 1

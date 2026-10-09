@@ -7,7 +7,11 @@ SCREENING ESTIMATES, not hydrodynamic modelling:
 2. Stations every `station_m` along the path. The DEM's river-surface profile is made
    monotonic (running minimum) and its slope taken over +/- `slope_window_m`.
 3. Flood level per station: a DEM cross-section perpendicular to the path, and the water
-   surface at which Manning's equation (normal depth) carries the peak discharge there.
+   surface at which Manning's equation (normal depth, n = 0.06 as NRSC use for the Chandra valley)
+   carries the peak discharge there. The breach peak decays downstream as exp(-km / 42.4 km), an
+   e-folding distance we fitted to the peak discharges NRSC's HEC-RAS runs report along the valley
+   for Gepang Gath and Samudra Tapu, and to South Lhonak 2023 (Sattar et al. 2025); the fit is
+   within a factor of about 2 at every point.
 4. Inundation corridor: DEM cells within `corridor_m` of the path that lie below the flood
    level of their nearest station and connect to the river.
 5. Arrival time: along-path distance divided by a flood-front speed taken from observed events.
@@ -45,7 +49,8 @@ class DownstreamParams:
     slope_window_m: float = 1000.0
     section_half_m: float = 2000.0  # cross-section half-width
     min_slope: float = 0.002  # floor for Manning's S on flat reaches
-    manning_n: float = 0.07
+    manning_n: float = 0.06  # NRSC, Chandra valley below Sissu
+    attenuation_km: float = 42.4  # e-folding distance of the peak, fitted to NRSC + South Lhonak
     corridor_m: float = 2000.0
     # flood-front speeds (m/s) for arrival times: expected and fast cases
     speed_expected: float = 8.0
@@ -206,9 +211,9 @@ def sample(dem: np.ndarray, grid: Grid, xs: np.ndarray, ys: np.ndarray) -> np.nd
     return ndimage.map_coordinates(dem, [rows - 0.5, cols - 0.5], order=1, mode="nearest")
 
 
-def discharge_at(km: float, peak_m3s: float) -> float:
-    """Peak discharge at `km` downstream. No attenuation yet: conservative (keeps the breach peak)."""
-    return peak_m3s
+def discharge_at(km: float, peak_m3s: float, attenuation_km: float) -> float:
+    """Peak discharge at `km` downstream: the breach peak decaying exponentially (see module notes)."""
+    return peak_m3s * math.exp(-km / attenuation_km)
 
 
 def route(
@@ -234,7 +239,7 @@ def route(
         norm = math.hypot(tx, ty) or 1.0
         nx, ny = -ty / norm, tx / norm
         ground = sample(dem, grid, sxy[i, 0] + offsets * nx, sxy[i, 1] + offsets * ny)
-        q = discharge_at(s[i] / 1000, peak_m3s)
+        q = discharge_at(s[i] / 1000, peak_m3s, p.attenuation_km)
         wse, width, capped = normal_depth_wse(offsets, ground, q, float(slope[i]), p.manning_n)
         pt = to_wgs84(Point(*sxy[i]), grid.crs)
         stations.append(
@@ -289,6 +294,21 @@ def compute_downstream(
     stations, grid, dem, sxy = route(crs, path_xy, peak_m3s, p)
     geom = corridor(stations, grid, dem, sxy, p)
     return Downstream(crs, [tuple(map(float, xy)) for xy in path_xy], stations, geom, asdict(p), {}, grid, dem, sxy)
+
+
+def compute_scenarios(
+    start_lonlat, blocked_wgs84, peaks_m3s: dict[str, float], p: DownstreamParams = DownstreamParams()
+) -> dict[str, Downstream]:
+    """One traced path, routed once per peak-discharge scenario."""
+    crs, path_xy = trace_path(start_lonlat, blocked_wgs84, p)
+    out = {}
+    for name, peak in peaks_m3s.items():
+        stations, grid, dem, sxy = route(crs, path_xy, peak, p)
+        geom = corridor(stations, grid, dem, sxy, p)
+        out[name] = Downstream(
+            crs, [tuple(map(float, xy)) for xy in path_xy], stations, geom, asdict(p), {}, grid, dem, sxy
+        )
+    return out
 
 
 def path_geojson(d: Downstream) -> dict:

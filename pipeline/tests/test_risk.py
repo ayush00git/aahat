@@ -55,7 +55,12 @@ def test_replay_never_sees_the_future():
 
 
 def test_levels():
-    assert level_for(10) == "low" and level_for(30) == "moderate" and level_for(50) == "high" and level_for(70) == "very_high"
+    assert (
+        level_for(10) == "low"
+        and level_for(30) == "moderate"
+        and level_for(50) == "high"
+        and level_for(70) == "very_high"
+    )
 
 
 def test_score_is_size_times_likelihood_and_group_weights_sum_to_one():

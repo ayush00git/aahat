@@ -79,10 +79,51 @@ It is a screening score for deciding where to look, not a probability that a lak
 Spill point and lake level come from the DEM: the outline is grown over the DEM's flat water surface, and of
 the 40 lowest shore cells the one whose downhill path has dropped most after 1 km is the outlet.
 
+### How the downstream estimate works
+
+`uv run aahat downstream --lake all` (after `risk`) writes, per lake, `downstream.json` (stations every 250 m
+for each scenario), `flood_path.geojson`, `corridor_expected.geojson`, `corridor_severe.geojson` and
+`impacts.json` (every settlement, bridge, road, hydro project, school and clinic near the path, nearest first).
+
+1. **Path:** steepest descent over the Copernicus DEM from the spill point, up to 150 km (pits escaped locally).
+2. **Breach peak, two scenarios:** *expected* = Evans 1986 (0.72·V^0.53), which lands closest to NRSC's
+   HEC-RAS dam-breach peak for Gepang Gath; *severe* = the larger of that and Huggel et al. 2002
+   (0.00077·V^1.017, a regression on lakes up to 19 million m³, so extrapolated above that).
+3. **Downstream decay:** peak × exp(−km / 42.4 km), an e-folding distance fitted to the peaks NRSC report along
+   the valley for both lakes and to South Lhonak 2023 (Sattar et al. 2025).
+4. **Flood level:** Manning normal depth (n = 0.06, as NRSC use below Sissu) on a DEM cross-section every 250 m.
+5. **Corridor:** DEM cells within 2 km of the path below their nearest station's flood level, connected to it.
+6. **Arrival:** distance ÷ flood-front speed, 10 m/s (fast) to 8 m/s (expected); South Lhonak 2023 averaged
+   about 8 m/s over 67.5 km.
+7. **Exposure:** OpenStreetMap (Geofabrik northern-India extract, Overpass outside it). An asset is
+   *in flood path* if it is flooded in the expected scenario, *at risk* if only in the severe one or within
+   10 m above the flood level near the corridor.
+
+**Check against NRSC's HEC-RAS modelling** (Gepang Gath, Samudra Tapu reports on Bhuvan): NRSC's peak discharge
+falls between our two scenarios at every benchmark site, and so does its flood depth at all but one
+(Sissu below Gepang Gath, where NRSC's 21.5 m exceeds our 17.5 m severe depth).
+
+| Site | NRSC peak, depth | Ours expected → severe |
+|---|---|---|
+| Gepang Gath → Sissu, 11 km | 9,378 m³/s, 21.5 m | 5,839, 7.1 m → 30,954, 17.5 m |
+| Gepang Gath → Tandi, 31 km | 4,123 m³/s, 10.4 m | 3,643, 11.8 m → 19,314, 25.9 m |
+| Samudra Tapu → Batal, 17.8 km | 15,692 m³/s, 17.1 m | 6,792, 13.8 m → 48,038, 32.3 m |
+| Samudra Tapu → Khoksar, 67 km | 6,665 m³/s, 12.9 m | 2,126, 5.8 m → 15,036, 14.8 m |
+| Samudra Tapu → Tandi, 110 km | 3,275 m³/s, 9.4 m | 773, 4.2 m → 5,470, 11.6 m |
+
+NRSC reports: [Gepang Gath](https://bhuvan.nrsc.gov.in/nhpfs/pdf/NRSC_GhepangGhatGlacialLake_GLOF_Risk_Assessment_Report.pdf),
+[Samudra Tapu](https://bhuvan.nrsc.gov.in/nhpfs/pdf/NRSC_SamudraTapuGlacialLake_GLOF_Risk_Assessment_Report.pdf).
+NRSC give "Sissu in just 21 minutes" for Gepang Gath; our fast–expected arrival there is 18–23 min.
+
+All of it is a screening estimate: normal depth on a 30 m DEM with no river bathymetry, empirical peaks with
+large scatter, and only what OpenStreetMap maps.
+
 ## Data
 
 - Sentinel-2 L2A COGs via [Earth Search](https://earth-search.aws.element84.com/v1) (AWS Open Data, us-west-2), read in place with HTTP range requests.
 - [Copernicus DEM GLO-30](https://registry.opendata.aws/copernicus-dem/) on AWS Open Data.
 - Lake seed points from OpenStreetMap where named there, refined from imagery.
+- Exposure from OpenStreetMap: [Geofabrik northern-India extract](https://download.geofabrik.de/asia/india/northern-zone.html), Overpass elsewhere.
+- Glacier outlines: Randolph Glacier Inventory 7.0 via the [GLIMS](https://www.glims.org) WFS.
 
 All downstream and risk numbers are screening estimates, not engineering hydraulics.
