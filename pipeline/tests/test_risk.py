@@ -4,8 +4,8 @@ from aahat.laketerrain import LakeTerrain
 from aahat.risk import Rule, growth_as_of, huggel_volume_m3, level_for, score_as_of
 
 
-def terrain(slope=5.0, share=0.4):
-    return LakeTerrain(4000, 77.2, 32.5, 1000, 87, slope, True, 1.0, share, [], {})
+def terrain(slope=5.0, avalanche_km2=0.4):
+    return LakeTerrain(4000, 77.2, 32.5, 1000, 87, slope, True, avalanche_km2, [], {})
 
 
 def years(areas):
@@ -68,6 +68,18 @@ def test_score_is_size_times_likelihood_and_group_weights_sum_to_one():
 
 
 def test_small_lake_in_steep_terrain_scores_below_large_growing_lake():
-    small = score_as_of("s", years({2017: 0.09e6, 2018: 0.09e6, 2019: 0.09e6}), lambda y: terrain(9, 0.45), 2019)
-    large = score_as_of("l", years({2017: 0.86e6, 2018: 0.88e6, 2019: 0.90e6}), lambda y: terrain(4, 0.27), 2019)
+    small = score_as_of("s", years({2017: 0.09e6, 2018: 0.09e6, 2019: 0.09e6}), lambda y: terrain(9, 0.6), 2019)
+    large = score_as_of("l", years({2017: 0.86e6, 2018: 0.88e6, 2019: 0.90e6}), lambda y: terrain(4, 0.5), 2019)
     assert large.score > small.score
+
+
+def test_glacier_rule_scores_contact_highest_and_none_as_zero():
+    r = Rule(500.0, 0.0)
+    assert r.score(0) == 1 and r.score(250) == 0.5 and r.score(800) == 0
+    ys = years({2017: 1.0e6, 2018: 1.02e6, 2019: 1.04e6})
+    rec = score_as_of("x", ys, lambda y: terrain(), 2019)
+    g = next(f for f in rec.factors if f.key == "glacier")
+    assert g.score == 0 and "no glacier" in g.note
+    ys[-1]["glacier_distance_m"] = 0
+    rec = score_as_of("x", ys, lambda y: terrain(), 2019)
+    assert next(f for f in rec.factors if f.key == "glacier").score == 1

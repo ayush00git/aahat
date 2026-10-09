@@ -53,6 +53,32 @@ Each yearly area carries a ±half-pixel shoreline uncertainty (perimeter × 5 m)
 share of the lake and its rim that was clearly observed at least twice. Below 90%, or with fewer than two clear
 scenes in the season, the year is marked `partial`.
 
+### How the hazard score works
+
+`uv run aahat risk --lake all` (after `series`) writes `out/lakes/<id>/risk.json` and `outlet.geojson`.
+
+**score = 100 × size × likelihood**, both 0–1, so a small pond in steep terrain can't outrank a large lake,
+and size alone can't put a quiet lake first. Every factor is a raw number with units, turned into 0–1 by a
+stated linear rule; the UI shows value, rule, score, weight, note and source for each.
+
+| Factor | Group | Measured as | 0 → 1 | Source of threshold |
+|---|---|---|---|---|
+| Water volume | size | Huggel et al. 2002, V = 0.104·A^1.42, from the latest full-coverage area | 10⁵ → 10⁸ m³ (log) | Kougkoulos et al. 2018 classes at 0.33 / 0.67 |
+| Lake growth | likelihood (¼) | Theil–Sen trend over full-coverage seasons, ×5; zero unless the change beats 2× measurement uncertainty | 0 → 25% per 5 yr | CWC 2024 top class |
+| Steepness below outlet | likelihood (¼) | mean gradient of the first 1 km of flow path below the spill point (DEM) | 0 → 10° | Fujita et al. 2013 steep-lakefront 10° |
+| Ice/rock fall sources | likelihood (¼) | area of > 30° slopes in the lake's catchment whose line to the lake is > 14° | 0 → 0.5 km² | Allen et al. 2016 (Himachal) definition, Rinzin et al. 2021 high class |
+| Distance to glacier ice | likelihood (¼) | Sentinel-2 snow/ice in ≥ half of cloud-free looks, patches ≥ 0.05 km² | 500 m → 0 m | Rinzin et al. 2021, CWC 2024 |
+
+Levels: low < 20 ≤ moderate < 40 ≤ high < 60 ≤ very high.
+
+**No hindsight:** the replay scores season Y using only seasons ≤ Y and the 2011–2015 DEM (`as_of_season`,
+`data_until` record what was used); a unit test checks that a later jump can't change an earlier score.
+
+It is a screening score for deciding where to look, not a probability that a lake will burst.
+
+Spill point and lake level come from the DEM: the outline is grown over the DEM's flat water surface, and of
+the 40 lowest shore cells the one whose downhill path has dropped most after 1 km is the outlet.
+
 ## Data
 
 - Sentinel-2 L2A COGs via [Earth Search](https://earth-search.aws.element84.com/v1) (AWS Open Data, us-west-2), read in place with HTTP range requests.

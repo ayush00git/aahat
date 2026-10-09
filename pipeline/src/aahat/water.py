@@ -55,6 +55,7 @@ class WaterParams:
     close_px: int = 2  # bridge brash ice and iceberg strings up to ~2*close_px pixels wide
     bridge_px: int = 10  # connect lake parts across never-seen pixels (cloud on the lake) up to this far from water
     ndwi_strong: float = 0.5  # an SCL-uncertain pixel counts (as water) only above this NDWI
+    min_glacier_m2: float = 50_000.0  # ice patches smaller than this are treated as snow, not glacier
 
 
 @dataclass
@@ -75,6 +76,7 @@ class Composite:
     scenes: list[SceneObs] = field(default_factory=list)
     inputs: list[Scene] = field(default_factory=list)
     min_obs: int = WaterParams.min_obs  # observations required per pixel (fewer if the season had fewer scenes)
+    ice_freq: np.ndarray | None = None  # share of a pixel's cloud-free looks classed snow/ice (SCL 11)
 
 
 def _reflectance(scene: Scene, key: str, grid: Grid, resampling=Resampling.bilinear) -> np.ndarray:
@@ -140,8 +142,17 @@ def composite(
     # but one scene is not truncated. `min_obs` (lowered when the season had fewer scenes) is the
     # confidence bar: the share of the lake seen that often becomes its `coverage`.
     min_obs = max(1, min(p.min_obs, len(chosen)))
+    # Glacier ice next to the lake: snow/ice in at least half of a pixel's cloud-free looks. Late in
+    # the post-monsoon window seasonal snow is mostly gone, so this is mostly glacier ice and firn.
+    ice = np.zeros(grid.shape, "int16")
+    cloud_free = np.zeros(grid.shape, "int16")
+    for _, scl in chosen:
+        cloud_free += ~np.isin(scl, (0, 1, 3, 8, 9, 10))
+        ice += scl == 11
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ice_freq = np.where(cloud_free > 0, ice / cloud_free, np.nan).astype("float32")
     water = (obs_count >= 1) & (freq >= p.min_freq) & (terrain.slope <= p.max_slope_deg)
-    return Composite(grid, water, obs_count, freq, obs, [s for s, _ in chosen], min_obs)
+    return Composite(grid, water, obs_count, freq, obs, [s for s, _ in chosen], min_obs, ice_freq)
 
 
 @dataclass
@@ -152,6 +163,7 @@ class LakeExtent:
     uncertainty_m2: float  # +/- half a pixel along the shoreline
     polygon: object  # shapely geometry in grid CRS
     coverage: float  # fraction of the lake (plus a 2 px rim) observed at least comp.min_obs times
+    glacier_distance_m: float | None = None  # lake to nearest glacier ice; None if none in the AOI
 
 
 def extract_lake(comp: Composite, seed_xy: tuple[float, float], p: WaterParams, search_m: float = 300.0) -> LakeExtent | None:
@@ -189,4 +201,27 @@ def extract_lake(comp: Composite, seed_xy: tuple[float, float], p: WaterParams, 
     perim = float(poly.length)
     rim = ndimage.binary_dilation(lake, iterations=2)
     coverage = float((comp.obs_count[rim] >= comp.min_obs).mean())
-    return LakeExtent(lake, area, perim, perim * grid.res / 2, poly, coverage)
+    return LakeExtent(lake, area, perim, perim * grid.res / 2, poly, coverage, glacier_distance(comp, lake, p))
+
+
+def glacier_distance(comp: Composite, lake: np.ndarray, p: WaterParams) -> float | None:
+    """Metres from the lake to the nearest glacier ice, or None if no glacier ice is in the AOI.
+
+    Ice = SCL snow/ice in at least half of a pixel's cloud-free looks, in patches of at least
+    `min_glacier_m2` (so a late-season snow patch is not mistaken for a glacier). Debris-covered
+    ice looks like rock to Sentinel-2 and is missed.
+    """
+    if comp.ice_freq is None:
+        return None
+    ice = np.nan_to_num(comp.ice_freq) >= 0.5
+    labels, n = ndimage.label(ice, structure=np.ones((3, 3)))
+    if n == 0:
+        return None
+    sizes = ndimage.sum_labels(ice, labels, range(1, n + 1)) * comp.grid.pixel_area_m2()
+    glacier = np.isin(labels, np.nonzero(sizes >= p.min_glacier_m2)[0] + 1)
+    if not glacier.any():
+        return None
+    if (glacier & ndimage.binary_dilation(lake)).any():
+        return 0.0
+    dist = ndimage.distance_transform_edt(~glacier) * comp.grid.res
+    return float(dist[lake].min())

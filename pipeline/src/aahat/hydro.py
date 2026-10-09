@@ -137,3 +137,31 @@ def path_length_m(path: list[tuple[int, int]], res: float) -> np.ndarray:
     p = np.array(path, dtype=float)
     seg = np.hypot(*(np.diff(p, axis=0).T)) * res
     return np.concatenate([[0.0], np.cumsum(seg)])
+
+
+def drains_to(dem: np.ndarray, target: np.ndarray, max_iter: int = 5000) -> np.ndarray:
+    """Cells whose steepest-descent (D8) path reaches `target`: the target's catchment.
+
+    Cells in pits drain nowhere and are left out, which is fine for screening.
+    """
+    h, w = dem.shape
+    z = np.where(np.isfinite(dem), dem, np.inf)
+    best = np.zeros(dem.shape, "float64")
+    recv_r = np.arange(h)[:, None].repeat(w, 1)
+    recv_c = np.arange(w)[None, :].repeat(h, 0)
+    padded = np.pad(z, 1, constant_values=np.inf)
+    for (dr, dc), step in zip(NEIGHBOURS, STEP):
+        nb = padded[1 + dr : 1 + dr + h, 1 + dc : 1 + dc + w]
+        grad = (z - nb) / step
+        better = grad > best
+        best[better] = grad[better]
+        recv_r[better] = (np.arange(h)[:, None] + dr).repeat(w, 1)[better]
+        recv_c[better] = (np.arange(w)[None, :] + dc).repeat(h, 0)[better]
+    has_receiver = best > 0
+    inside = target.copy()
+    for _ in range(max_iter):
+        grown = inside | (has_receiver & inside[recv_r.clip(0, h - 1), recv_c.clip(0, w - 1)])
+        if (grown == inside).all():
+            break
+        inside = grown
+    return inside

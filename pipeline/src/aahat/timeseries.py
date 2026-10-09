@@ -43,6 +43,7 @@ class LakeYear:
     first_day: str | None
     last_day: str | None
     params: dict
+    glacier_distance_m: float | None = None  # lake to nearest glacier ice (Sentinel-2 SCL); None if none seen
 
 
 def lake_focus(grid, seed_xy: tuple[float, float], radius_m: float) -> np.ndarray:
@@ -95,6 +96,7 @@ def lake_year(
         len(used),
         *days,
         asdict(p),
+        None if ext.glacier_distance_m is None else round(ext.glacier_distance_m),
     )
     return rec, comp, ext
 
@@ -155,7 +157,7 @@ def build_index(out_dir: Path) -> dict:
         fc = {"type": "FeatureCollection", "features": outlines}
         (path.parent / "outlines.geojson").write_text(json.dumps(fc, ensure_ascii=False))
         years = [
-            {k: r[k] for k in ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear")}
+            {k: r.get(k) for k in ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear", "glacier_distance_m")}
             for r in s["years"]
         ]
         measured = [r for r in years if r["area_m2"] is not None]

@@ -59,3 +59,17 @@ def test_spill_mask_grows_over_flat_surface_without_creeping_downstream():
     assert grown[old_lake].all()
     assert not grown[:, 27:].any()  # did not creep down the valley
     assert outlet_cell(dem, grown)[1] in (26, 27)  # first cell past the surface edge
+
+
+def test_drains_to_excludes_the_next_valley():
+    from aahat.hydro import drains_to
+
+    rows, cols = np.mgrid[0:40, 0:40]
+    dem = (100.0 + 10.0 * np.abs(cols - 20)).astype("float32")  # ridge-less V valley along rows, axis at col 20
+    dem += 1.0 * rows  # sloping down toward row 0
+    dem[:, 35:] = 100.0 + 10.0 * (40 - cols[:, 35:])  # past a ridge at col 35, slopes fall away east
+    lake = np.zeros(dem.shape, bool)
+    lake[0:3, 18:23] = True
+    c = drains_to(dem, lake)
+    assert c[30, 20] and c[20, 10]  # valley floor and its west flank drain to the lake
+    assert not c[20, 38]  # beyond the ridge

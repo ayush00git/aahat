@@ -2,8 +2,10 @@
 
 Score = 100 x size x likelihood.
 - size: how much water could come out (volume from area, Huggel et al. 2002), 0-1.
-- likelihood: weighted mean of what makes a release more likely: the lake growing, a steep drop
-  below its outlet, and steep slopes above it that can drop ice or rock into it, 0-1.
+- likelihood: equal-weight mean (as in Allen et al. 2019) of what makes a release more likely: the
+  lake growing, a steep drop below its outlet, slopes that can drop ice or rock into it, and glacier
+  ice at its shore, 0-1. Thresholds follow published criteria, cited per factor, including India's
+  CWC 2024 risk-indexing criteria.
 Multiplying keeps a small pond in steep terrain from outranking a large lake, and a large lake
 with nothing pushing it from being ranked first by size alone.
 
@@ -29,6 +31,11 @@ import numpy as np
 from .laketerrain import LakeTerrain, TerrainParams, lake_terrain, outlet_geojson
 
 HUGGEL_2002 = "https://doi.org/10.1139/t01-099"
+KOUGKOULOS_2018 = "https://doi.org/10.1016/j.scitotenv.2017.10.083"
+CWC_2024 = "https://cwc.gov.in/sites/default/files/final-report-risk-index-criteria1-final-book.pdf"
+FUJITA_2013 = "https://doi.org/10.5194/nhess-13-1827-2013"
+ALLEN_2016 = "https://doi.org/10.1007/s11069-016-2511-x"
+RINZIN_2021 = "https://doi.org/10.3389/feart.2021.775195"
 MIN_GROWTH_YEARS = 3
 
 
@@ -90,20 +97,22 @@ FACTORS: tuple[FactorSpec, ...] = (
         "m³",
         Rule(5.0, 8.0, log10=True),
         1.0,
-        "More water means a bigger, longer-reaching flood.",
-        f"Huggel et al. 2002, V = 0.104·A^1.42 ({HUGGEL_2002})",
+        "More water means a bigger, longer-reaching flood. On this scale 1 and 10 million m³ (the low/medium "
+        "and medium/high class limits of Kougkoulos et al. 2018) sit at 0.33 and 0.67.",
+        f"Volume from area by Huggel et al. 2002, V = 0.104·A^1.42 ({HUGGEL_2002}); classes: {KOUGKOULOS_2018}",
     ),
     FactorSpec(
         "growth",
         "likelihood",
-        "Lake growth rate",
-        "झील बढ़ने की दर",
-        "%/yr",
-        Rule(0.0, 3.0),
-        1 / 3,
-        "A growing lake stores more water and usually means its glacier is retreating.",
-        "Sentinel-2 yearly areas (this pipeline): Theil-Sen trend over full-coverage seasons, counted only "
-        "when the change exceeds twice the measurement uncertainty",
+        "Lake growth",
+        "झील का बढ़ना",
+        "% per 5 yr",
+        Rule(0.0, 25.0),
+        0.25,
+        "A growing lake stores more water and usually means its glacier is retreating. CWC's top class is "
+        "over 25% area growth in 5 years.",
+        "Sentinel-2 yearly areas (this pipeline), Theil-Sen trend over full-coverage seasons, counted only when "
+        f"the change exceeds twice the measurement uncertainty; scale from CWC 2024 ({CWC_2024})",
     ),
     FactorSpec(
         "outlet_slope",
@@ -112,20 +121,36 @@ FACTORS: tuple[FactorSpec, ...] = (
         "निकास के नीचे ढलान",
         "°",
         Rule(0.0, 10.0),
-        1 / 3,
-        "A steep drop below the dam lets a breach cut down fast.",
-        "Copernicus GLO-30 DEM: mean gradient over the first 1 km below the spill point",
+        0.25,
+        "A steep drop right below the dam lets a breach cut down fast. Fujita et al. 2013 treat lakes with "
+        "no 'steep lakefront' (over 10°) as unlikely to fail.",
+        f"Copernicus GLO-30 DEM: mean gradient over the first 1 km below the spill point; 10° from {FUJITA_2013}",
     ),
     FactorSpec(
-        "steep_slopes",
+        "avalanche",
         "likelihood",
-        "Steep slopes above the lake",
-        "झील के ऊपर खड़ी ढलानें",
-        "% of land",
-        Rule(0.0, 50.0),
-        1 / 3,
-        "Ice or rock falling into the lake can send a wave over the dam.",
-        "Copernicus GLO-30 DEM: share of land above lake level within 1 km of the shore that is >= 30° steep",
+        "Ice/rock fall source area",
+        "बर्फ़/चट्टान गिरने का क्षेत्र",
+        "km²",
+        Rule(0.0, 0.5),
+        0.25,
+        "Ice or rock falling into the lake can send a wave over the dam: the commonest GLOF trigger.",
+        "Copernicus GLO-30 DEM: slopes over 30° in the lake's catchment whose line to the lake is steeper "
+        f"than 14° (Allen et al. 2016, Himachal Pradesh, {ALLEN_2016}); 0.5 km² is the high class of "
+        f"Rinzin et al. 2021 ({RINZIN_2021})",
+    ),
+    FactorSpec(
+        "glacier",
+        "likelihood",
+        "Distance to glacier ice",
+        "ग्लेशियर से दूरी",
+        "m",
+        Rule(500.0, 0.0),
+        0.25,
+        "A lake touching its glacier gets calving ice and ice avalanches. Rinzin et al. 2021 rate contact as "
+        "high and within 500 m as medium; CWC's top class is a snout within 0.5 km.",
+        "Sentinel-2 snow/ice class in at least half of the season's cloud-free looks, patches of 0.05 km² or "
+        f"more (debris-covered ice is missed); thresholds from {RINZIN_2021} and {CWC_2024}",
     ),
 )
 
@@ -208,9 +233,10 @@ def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int) -> Ri
     terrain: LakeTerrain = terrain_for(current["year"])
     volume = huggel_volume_m3(current["area_m2"])
     growth = growth_as_of(years, season)
+    gd = current.get("glacier_distance_m")
     values = {
         "volume": (volume, f"from {current['area_m2'] / 1e6:.3f} km² measured in {current['year']}", True),
-        "growth": (growth.pct_per_yr, growth.note, growth.significant),
+        "growth": (None if growth.pct_per_yr is None else 5 * growth.pct_per_yr, growth.note, growth.significant),
         "outlet_slope": (
             terrain.outlet_slope_deg,
             f"{terrain.outlet_drop_m:.0f} m drop over {terrain.outlet_run_m:.0f} m"
@@ -218,13 +244,20 @@ def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int) -> Ri
             else "no surface outflow found below the spill point",
             True,
         ),
-        "steep_slopes": (100 * terrain.steep_share, f"{terrain.steep_area_km2:.2f} km² of >= 30° slopes", True),
+        "avalanche": (terrain.avalanche_area_km2, "slopes > 30° that can reach the lake", True),
+        "glacier": (
+            gd,
+            f"measured in {current['year']}"
+            if gd is not None
+            else "no glacier ice seen within the lake's area of interest",
+            gd is not None,
+        ),
     }
     factors = []
     for spec in FACTORS:
         value, note, counts = values[spec.key]
         s = spec.rule.score(value) if counts else 0.0
-        shown = None if value is None else round(value, 3 if spec.key == "growth" else 1)
+        shown = None if value is None else round(value, 2 if spec.key in ("growth", "avalanche") else 1)
         factors.append(
             Factor(
                 spec.key,
