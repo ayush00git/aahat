@@ -189,4 +189,7 @@ def test_fetch_assets_prefers_local_extract_when_it_covers_the_box(tmp_path, mon
     assets = ex.fetch_assets((77.0, 32.4, 77.3, 32.6))
     assert sorted(a.name for a in assets) == ["Manali-Leh", "Sissu"]
     assert not ox.covers((85.0, 27.0, 86.0, 28.0))  # outside the extract: Overpass would be used
+    filtered.unlink()
+    ox._load.cache_clear()
+    assert ox.covers((77.0, 32.4, 77.3, 32.6))  # not built yet, but known coverage: built on first use
     ox._load.cache_clear()

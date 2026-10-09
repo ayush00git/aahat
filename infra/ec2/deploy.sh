@@ -20,7 +20,10 @@ done
 echo "== ship"
 $SSH 'sudo mkdir -p /tmp/aahat/data/lakes && sudo chown -R ec2-user /tmp/aahat'
 eval $RSYNC "$ROOT/api/bin/aahat-server" "ec2-user@$PUBLIC_IP:/tmp/aahat/"
-eval $RSYNC --include='*/' --include='*.json' --include='*.geojson' --exclude='*' "$ROOT/pipeline/out/lakes/" "ec2-user@$PUBLIC_IP:/tmp/aahat/data/lakes/"
+# The server refreshes its own data weekly; only seed it on the first deploy (or AAHAT_SYNC_DATA=1).
+if [ -n "${AAHAT_SYNC_DATA:-}" ] || ! $SSH test -f /srv/aahat/data/lakes/index.json; then
+  eval $RSYNC --include='*/' --include='*.json' --include='*.geojson' --exclude='*' "$ROOT/pipeline/out/lakes/" "ec2-user@$PUBLIC_IP:/tmp/aahat/data/lakes/"
+fi
 for app in ${AAHAT_WEB_APPS:-villager dashboard}; do
   [ -z "${AAHAT_SKIP_WEB:-}" ] && [ -d "$ROOT/web/$app/dist" ] && eval $RSYNC "$ROOT/web/$app/dist/" "ec2-user@$PUBLIC_IP:/tmp/aahat/web-$app/"
 done
@@ -32,7 +35,8 @@ echo "== install"
 $SSH "AWS_REGION=$AWS_REGION AAHAT_SMS=${AAHAT_SMS:-} bash -s" <<'REMOTE'
 set -euo pipefail
 sudo install -m 755 /tmp/aahat/aahat-server /srv/aahat/bin/aahat-server
-sudo rsync -a --delete /tmp/aahat/data/ /srv/aahat/data/
+[ -f /tmp/aahat/data/lakes/index.json ] && sudo rsync -a --delete /tmp/aahat/data/ /srv/aahat/data/
+sudo rm -rf /tmp/aahat/data && mkdir -p /tmp/aahat/data/lakes
 for app in ${AAHAT_WEB_APPS:-villager dashboard}; do
   [ -d /tmp/aahat/web-$app ] && sudo rsync -a --delete /tmp/aahat/web-$app/ /srv/aahat/web/$app/
 done

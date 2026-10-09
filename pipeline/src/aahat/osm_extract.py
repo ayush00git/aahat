@@ -22,6 +22,8 @@ log = logging.getLogger(__name__)
 # Himachal Pradesh, Jammu & Kashmir, Ladakh, Punjab, Haryana, Delhi, Chandigarh, Uttarakhand, UP.
 EXTRACT_URL = "https://download.geofabrik.de/asia/india/northern-zone-261008.osm.pbf"
 TRACKED_KEYS = ("place", "highway", "man_made", "power", "waterway", "amenity")
+# Coverage box of the extract (from its file header), so a fresh machine knows to download it.
+EXTRACT_BOUNDS = (69.169911, 23.046881, 80.167546, 36.137884)
 
 
 def _filtered_path(url: str) -> Path:
@@ -81,11 +83,11 @@ def _load(path: str) -> dict:
 
 
 def covers(bounds: tuple[float, float, float, float], url: str = EXTRACT_URL) -> bool:
-    """True if the filtered extract exists locally and its coverage box contains `bounds`."""
+    """True if the extract's coverage box contains `bounds` (it is downloaded on first use)."""
     path = _filtered_path(url)
-    if not path.exists():
+    b = _load(str(path))["bounds"] if path.exists() else (EXTRACT_BOUNDS if url == EXTRACT_URL else None)
+    if b is None:
         return False
-    b = _load(str(path))["bounds"]
     return b[0] <= bounds[0] and b[1] <= bounds[1] and bounds[2] <= b[2] and bounds[3] <= b[3]
 
 
