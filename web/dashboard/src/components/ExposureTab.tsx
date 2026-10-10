@@ -5,12 +5,14 @@ import { MoreToggle, Section, SourceText, StatusBadge } from "./ui";
 
 const KINDS: ImpactKind[] = ["settlement", "school", "health", "bridge", "road", "hydro"];
 
+function one(v: number | null | undefined, signed = false): string {
+  if (v === null || v === undefined) return DASH;
+  const s = num(Math.abs(v), 1);
+  return signed ? (v > 0 ? "+" : v < 0 ? "−" : "") + s : num(v, 1);
+}
+
 function pair(a: number | null | undefined, b: number | null | undefined, signed = false): string {
-  const f = (v: number | null | undefined) => {
-    if (v === null || v === undefined) return DASH;
-    const s = num(Math.abs(v), 1);
-    return signed ? (v > 0 ? "+" : v < 0 ? "−" : "") + s : num(v, 1);
-  };
+  const f = (v: number | null | undefined) => one(v, signed);
   if ((a === null || a === undefined) && (b === null || b === undefined)) return DASH;
   // The zero-width space after the slash lets the pair wrap onto two lines in a narrow panel.
   return `${f(a)} /\u200b${f(b)}`;
@@ -172,18 +174,25 @@ export function ExposureTab({
   const countKinds = KINDS.filter((k) => counts[k]);
   const gaps = downstream?.exposure_gaps_km ?? ds?.exposure_gaps_km ?? [];
   const scen = downstream?.discharge.scenarios;
+  // Small lakes: one relation gives both peaks, so expected and severe are the same flood.
+  const same = downstream?.discharge.scenarios_identical ?? ds?.scenarios_identical ?? false;
+  // One figure instead of "expected / severe" where the two are the same.
+  const both = (a: number | null | undefined, b: number | null | undefined, signed = false) =>
+    same && (a ?? null) === (b ?? null) ? one(a, signed) : pair(a, b, signed);
 
   return (
     <div class="tab-body">
       <Section title="Flood scenarios" aside={<span class="muted">{num(downstream?.path_km ?? ds?.path_km, 1)} km modelled</span>}>
         {scen ? (
-          <div class="scenario-cards">
-            {(["expected", "severe"] as ScenarioName[]).map((s) => {
-              const d = scen[s];
+          <div class={`scenario-cards${same ? " single" : ""}`}>
+            {((same ? ["expected"] : ["expected", "severe"]) as ScenarioName[]).map((s) => {
+              const d = scen[s] ?? (same ? scen.severe : undefined);
               if (!d) return null;
               return (
                 <div key={s} class={`scenario-card ${s}`}>
-                  <div class="scenario-name">{s === "expected" ? "Expected" : "Severe"}</div>
+                  <div class="scenario-name">
+                    {same ? "Expected and severe (same for a lake this small)" : s === "expected" ? "Expected" : "Severe"}
+                  </div>
                   <div class="scenario-peak">{discharge(d.peak_m3s)}</div>
                   <details class="more">
                     <summary>Relation · source</summary>
@@ -314,15 +323,18 @@ export function ExposureTab({
                   <span class="th-sub">min</span>
                 </th>
                 {more && (
-                  <th class="num" title="Flood depth at the river, expected / severe">
+                  <th class="num" title={same ? "Flood depth at the river (expected and severe are the same)" : "Flood depth at the river, expected / severe"}>
                     Depth m<br />
-                    <span class="th-sub">exp / sev</span>
+                    <span class="th-sub">{same ? "exp = sev" : "exp / sev"}</span>
                   </th>
                 )}
                 {more && (
-                  <th class="num" title="Height of the asset above the flood level (negative: under water), expected / severe">
+                  <th
+                    class="num"
+                    title={`Height of the asset above the flood level (negative: under water)${same ? "; expected and severe are the same" : ", expected / severe"}`}
+                  >
                     Above flood m<br />
-                    <span class="th-sub">exp / sev</span>
+                    <span class="th-sub">{same ? "exp = sev" : "exp / sev"}</span>
                   </th>
                 )}
               </tr>
@@ -361,8 +373,8 @@ export function ExposureTab({
                         ? DASH
                         : arrival(row.fast, row.expected).replace(" min", "").replace("~", "")}
                     </td>
-                    {more && <td class="num pair">{pair(e?.flood_depth_m, s?.flood_depth_m)}</td>}
-                    {more && <td class="num pair">{pair(e?.height_above_flood_m, s?.height_above_flood_m, true)}</td>}
+                    {more && <td class="num pair">{both(e?.flood_depth_m, s?.flood_depth_m)}</td>}
+                    {more && <td class="num pair">{both(e?.height_above_flood_m, s?.height_above_flood_m, true)}</td>}
                   </tr>
                 );
               })}
@@ -377,8 +389,10 @@ export function ExposureTab({
           </table>
         </div>
         <p class="caption">
-          {STATUS_LABEL.in_flood_path}: flooded in the expected scenario. {STATUS_LABEL.at_risk}: flooded only in the
-          severe scenario, or just above it. Click a row to show it on the map.
+          {same
+            ? `${STATUS_LABEL.in_flood_path}: flooded. ${STATUS_LABEL.at_risk}: just above the flood. `
+            : `${STATUS_LABEL.in_flood_path}: flooded in the expected scenario. ${STATUS_LABEL.at_risk}: flooded only in the severe scenario, or just above it. `}
+          Click a row to show it on the map.
           {merged && " ×N: N neighbouring map pieces with the same name, kind and status, shown as one row with their km range; More columns lists each one."}
         </p>
       </Section>

@@ -27,7 +27,9 @@ const DRAIN_STATUS: Record<string, string> = {
 function drainLine(d: DrainSummary | null | undefined): string | null {
   if (!d || (!d.as_of && !d.status)) return null;
   const latest = d.latest_day ?? (typeof d.latest === "string" ? d.latest : d.latest?.day) ?? null;
-  const parts = [dateOnly(d.as_of)];
+  // Too small for a single-scene check: none was run, so there is no check date or scene to show.
+  if (d.status === "too_small" && !latest && !d.drained) return `not run: ${DRAIN_STATUS.too_small}`;
+  const parts = d.as_of ? [dateOnly(d.as_of)] : [];
   if (latest) parts.push(`latest scene ${dateOnly(latest)}`);
   if (d.status) parts.push(DRAIN_STATUS[d.status] ?? d.status);
   if (typeof d.drop_fraction === "number") {

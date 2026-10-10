@@ -1,4 +1,4 @@
-import { dateOnly, dateTime, discharge, factorValue, km2, LEVEL_LABEL, num, volume } from "../format";
+import { dateOnly, dateTime, discharge, factorValue, km2, LEVEL_LABEL, num, relationName, volume } from "../format";
 import type { Factor, RiskFile, WeatherOutlook } from "../types";
 import { ReplayChart } from "./charts";
 import { LevelBadge, ScoreBar, Section, SourceText, WeatherBadge } from "./ui";
@@ -96,7 +96,9 @@ function FactorRow({ f }: { f: Factor }) {
             {f.label_hi}
           </span>
         </span>
-        <span class="factor-value">{factorValue(f.value, f.unit)}</span>
+        <span class="factor-value" title={f.value === null && f.note ? f.note : undefined}>
+          {factorValue(f.value, f.unit)}
+        </span>
       </div>
       <div class="factor-score">
         <ScoreBar value={f.score} label={`${f.label} score`} />
@@ -136,6 +138,14 @@ export function RiskTab({ risk, weather }: { risk: RiskFile; weather?: WeatherOu
     [...new Set(r.factors.map((f) => f.group))].filter((g) => g !== "size" && g !== "likelihood"),
   );
   const groupScore = (g: string) => (g === "size" ? r.size : g === "likelihood" ? r.likelihood : null);
+  // Null on records written before the pipeline named the relation.
+  const peakRelation = relationName(r.peak_discharge_relation);
+  // Small lakes: one relation gives both peaks, so the severe peak is also the expected one.
+  const samePeak =
+    r.peak_expected_m3s != null &&
+    r.peak_expected_m3s === r.peak_discharge_m3s &&
+    !!r.peak_expected_relation &&
+    r.peak_expected_relation === r.peak_discharge_relation;
 
   return (
     <div class="tab-body">
@@ -157,7 +167,17 @@ export function RiskTab({ risk, weather }: { risk: RiskFile; weather?: WeatherOu
           </div>
           <div>
             <dt>Peak discharge (severe)</dt>
-            <dd>{discharge(r.peak_discharge_m3s)}</dd>
+            <dd>
+              {discharge(r.peak_discharge_m3s)}
+              {peakRelation && (
+                <span
+                  class="muted small block dd-sub"
+                  title={`${r.peak_discharge_relation}${samePeak ? ". The expected scenario has the same peak for a lake this small." : ""}`}
+                >
+                  {peakRelation}
+                </span>
+              )}
+            </dd>
           </div>
           <div>
             <dt>Data until</dt>

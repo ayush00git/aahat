@@ -17,6 +17,8 @@ export function num(v: number | null | undefined, digits = 0): string {
 
 export function km2(m2: number | null | undefined, digits = 3): string {
   if (m2 === null || m2 === undefined) return DASH;
+  // A real lake under half the last digit would print as "0.000 km²": say "<0.001 km²".
+  if (m2 > 0 && m2 / 1e6 < 0.5 * 10 ** -digits) return `<${nf(digits).format(10 ** -digits)} km²`;
   return `${nf(digits).format(m2 / 1e6)} km²`;
 }
 
@@ -29,6 +31,24 @@ export function volume(m3: number | null | undefined): string {
 export function discharge(m3s: number | null | undefined): string {
   if (m3s === null || m3s === undefined) return DASH;
   return `${nf(0).format(m3s)} m³/s`;
+}
+
+const RELATION_NAME: Record<string, string> = {
+  evans1986: "Evans 1986",
+  huggel2002: "Huggel et al. 2002",
+  popov1991: "Popov 1991",
+};
+
+/**
+ * Short citation for a peak-discharge relation, from its key ("evans1986") or
+ * from the API's "evans1986: Qmax = 0.72 V^0.53" string. Null when there is none.
+ */
+export function relationName(relation: string | null | undefined): string | null {
+  if (!relation) return null;
+  const key = relation.split(":")[0].trim();
+  if (RELATION_NAME[key]) return RELATION_NAME[key];
+  const m = /^([a-z]+)(\d{4})$/i.exec(key);
+  return m ? `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}` : key || null;
 }
 
 /** Whole minutes, rounded down (as the API's warning messages do: never later than modelled). */

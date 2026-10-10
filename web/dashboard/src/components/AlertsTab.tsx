@@ -376,7 +376,15 @@ export function AlertsTab({ lake, downstream }: { lake: Lake; downstream: Downst
     }
   };
 
-  const peak = (s: ScenarioName) => downstream?.discharge.scenarios[s]?.peak_m3s ?? lake.downstream?.peak_m3s?.[s] ?? null;
+  const ds = lake.downstream;
+  // The index's peak_m3s object is the older API's name for the same two numbers.
+  const peak = (s: ScenarioName) =>
+    downstream?.discharge.scenarios[s]?.peak_m3s ??
+    (s === "expected" ? ds?.peak_expected_m3s : ds?.peak_severe_m3s) ??
+    ds?.peak_m3s?.[s] ??
+    null;
+  // Small lakes: one relation gives both peaks, so either choice models the same flood.
+  const sameFlood = downstream?.discharge.scenarios_identical ?? ds?.scenarios_identical ?? false;
 
   return (
     <div class="tab-body">
@@ -402,6 +410,11 @@ export function AlertsTab({ lake, downstream }: { lake: Lake; downstream: Downst
               </button>
             ))}
           </div>
+          {sameFlood && (
+            <p class="caption">
+              Expected and severe are the same flood for a lake this small: both give the same peak.
+            </p>
+          )}
           <label class="field">
             <span>Note for the log</span>
             <input

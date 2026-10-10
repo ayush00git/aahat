@@ -31,11 +31,14 @@ export function GrowthTab({ lake, risk }: { lake: Lake; risk: RiskFile | null })
 
       <Section title="Lake area by year">
         <GrowthChart years={years} />
-        {growth && (
-          <p class="lead">
-            Trend <b>{num(growth.value, 2)} {growth.unit}</b>
-          </p>
-        )}
+        {growth &&
+          (growth.value !== null ? (
+            <p class="lead">
+              Trend <b>{num(growth.value, 2)} {growth.unit}</b>
+            </p>
+          ) : (
+            <p class="muted">Trend not measured{growth.note ? `: ${growth.note}` : ""}.</p>
+          ))}
         {partial.length > 0 && <p class="note">Partial coverage: {partial.join(", ")} (not used for the trend).</p>}
         <details class="more">
           <summary>How to read the chart</summary>

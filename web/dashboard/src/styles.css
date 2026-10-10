@@ -1403,6 +1403,9 @@ code,
   font-size: var(--fs-md);
   font-weight: 600;
 }
+.kv dd .dd-sub {
+  font-weight: 400;
+}
 
 /* risk */
 .score-hero {
@@ -1798,6 +1801,9 @@ code,
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+.scenario-cards.single {
+  grid-template-columns: 1fr;
 }
 .scenario-card {
   border-radius: var(--r);

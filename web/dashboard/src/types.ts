@@ -26,7 +26,8 @@ export interface DrainSummary {
   drained?: boolean;
   /** Share of the season composite's area lost on the latest clear scene (0.41 = fell 41%). */
   drop_fraction?: number | null;
-  status?: "ok" | "no_clear_scene" | "frozen_or_snow" | "not_found" | string;
+  /** "too_small": the lake is under the size one scene can check, so no check is run. */
+  status?: "ok" | "no_clear_scene" | "frozen_or_snow" | "not_found" | "too_small" | string;
   latest_day?: string | null;
   latest?: { day?: string | null } | string | null;
 }
@@ -37,7 +38,13 @@ export interface IndexRisk {
   score: number | null;
   level: RiskLevel;
   volume_m3: number | null;
+  /** The severe-scenario peak. */
   peak_discharge_m3s: number | null;
+  /** "evans1986: Qmax = 0.72 V^0.53": relation key, then its formula (newer pipeline runs only). */
+  peak_discharge_relation?: string | null;
+  peak_expected_m3s?: number | null;
+  peak_severe_m3s?: number | null;
+  peak_expected_relation?: string | null;
 }
 
 export interface ImpactBrief {
@@ -54,7 +61,14 @@ export interface ImpactBrief {
 
 export interface IndexDownstream {
   path_km: number | null;
-  peak_m3s: { expected: number | null; severe: number | null } | null;
+  peak_expected_m3s?: number | null;
+  peak_severe_m3s?: number | null;
+  /** The formula behind each scenario's peak. */
+  peak_relations?: Partial<Record<ScenarioName, string>> | null;
+  /** True for small lakes, where one relation gives both peaks: expected and severe are the same flood. */
+  scenarios_identical?: boolean;
+  /** Deprecated alias of peak_expected_m3s / peak_severe_m3s (older API). */
+  peak_m3s?: { expected: number | null; severe: number | null } | null;
   first_exposed: ImpactBrief | null;
   first_settlement: ImpactBrief | null;
   exposed_counts: Partial<Record<ImpactKind, { in_flood_path: number; at_risk: number }>> | null;
@@ -161,7 +175,13 @@ export interface RiskRecord {
   area_m2: number | null;
   area_year: number | null;
   volume_m3: number | null;
+  /** The severe-scenario peak. */
   peak_discharge_m3s: number | null;
+  /** "huggel2002: Qmax = 0.00077 V^1.017"; absent or null on older records. */
+  peak_discharge_relation?: string | null;
+  peak_expected_m3s?: number | null;
+  peak_severe_m3s?: number | null;
+  peak_expected_relation?: string | null;
   terrain: Record<string, unknown> | null;
 }
 
@@ -181,6 +201,8 @@ export interface RiskFile {
 
 export interface DischargeScenario {
   peak_m3s: number | null;
+  /** "evans1986", "huggel2002" (newer pipeline runs only). */
+  relation_key?: string;
   relation: string;
   source: string;
   note?: string;
@@ -198,6 +220,9 @@ export interface Station {
   width_m: number;
   arrival_min_expected: number;
   arrival_min_fast: number;
+  /** How far the water reaches on each side of the channel, metres (newer pipeline runs only). */
+  left_m?: number;
+  right_m?: number;
 }
 
 export interface DownstreamFile {
@@ -206,6 +231,8 @@ export interface DownstreamFile {
   volume_m3: number | null;
   discharge: {
     scenarios: Record<ScenarioName, DischargeScenario>;
+    /** True when both scenarios use the same relation, so are the same flood (small lakes). */
+    scenarios_identical?: boolean;
     all: Record<string, number>;
   };
   path_km: number | null;

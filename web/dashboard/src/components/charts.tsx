@@ -187,7 +187,8 @@ export function GrowthChart({ years }: { years: YearRecord[] }) {
     return ok.map(({ y, i }, k) => `${k ? "L" : "M"}${xs[i].toFixed(1)},${sy((y.area_m2 as number) / 1e6).toFixed(1)}`).join("");
   })();
   const h = hov.idx !== null ? ys[hov.idx] : null;
-  const decimals = hi / 1e6 < 0.5 ? 3 : 2;
+  // Very small lakes need a fourth decimal, or neighbouring ticks print the same label.
+  const decimals = hi / 1e6 < 0.005 ? 4 : hi / 1e6 < 0.5 ? 3 : 2;
 
   return (
     <div class="chart">
