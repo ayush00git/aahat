@@ -1,4 +1,4 @@
-{$SITE_HOST} {
+{$SITE_HOST}{$SITE_ALIASES} {
 	encode zstd gzip
 	handle_path /api/* {
 		reverse_proxy 127.0.0.1:8080

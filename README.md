@@ -13,9 +13,9 @@ evidence behind each number and an alert tool that warns the nearest villages fi
 
 | | Live link |
 |---|---|
-| Villager app (Hindi first, installable) | <https://15-206-138-242.sslip.io/> |
-| Officials' dashboard | <https://15-206-138-242.sslip.io/officials/> |
-| API | <https://15-206-138-242.sslip.io/api/lakes> (all routes in [API.md](API.md)) |
+| Villager app (Hindi first, installable) | <https://aahat.ayyush.dev/> |
+| Officials' dashboard | <https://aahat.ayyush.dev/officials/> |
+| API | <https://aahat.ayyush.dev/api/lakes> (all routes in [API.md](API.md)) |
 
 Every flood figure in Aahat is a screening estimate from a 30 m elevation model, not a hydraulic model.
 Aahat does not detect a burst as it happens and does not predict when a lake will burst.
@@ -51,7 +51,7 @@ Search covers 19,803 named settlements in and around Himachal Pradesh, in Englis
 
 ## Try it in two minutes
 
-1. Open <https://15-206-138-242.sslip.io/> and search for **Thirot** (or type थिरोट), a village in Lahaul and
+1. Open <https://aahat.ayyush.dev/> and search for **Thirot** (or type थिरोट), a village in Lahaul and
    Spiti district. One lake threatens it: Gepang Gath, about 64 km up the river. The village is "at risk"
    (amber), not "in flood path" (red): it is not flooded in the expected scenario, only in the severe one or
    within 10 m above the flood level. The fast arrival estimate is about 106 minutes. Below that the app
@@ -61,13 +61,13 @@ Search covers 19,803 named settlements in and around Himachal Pradesh, in Englis
    dangerous?). Answers typically take 7 to 20 seconds. Compare the numbers with step 4.
 3. Search for **Hamirpur** (two places share the name; the district tells them apart). Neither is in a mapped
    flood path, and the app says so as "not covered", which is not the same as safe.
-4. Open <https://15-206-138-242.sslip.io/officials/> and pick **Gepang Gath** in the list.
+4. Open <https://aahat.ayyush.dev/officials/> and pick **Gepang Gath** in the list.
    - **Risk**: the score written out, each factor with its value, rule and source link, and the replay of the
      score season by season.
    - **Downstream exposure**: the two peak discharges with their formulas, and every exposed place nearest first.
    - **Data & evidence**: per season, the area, coverage and the Sentinel-2 scenes used, with a link to view
      that imagery in Copernicus Browser.
-5. Check any number against the API: `curl https://15-206-138-242.sslip.io/api/lakes/gepang-gath`.
+5. Check any number against the API: `curl https://aahat.ayyush.dev/api/lakes/gepang-gath`.
 6. The **Alerts** tab runs a simulated burst. It needs the officials' token, which is not published here; it
    is available to judges on request. Dry run is ticked by default: the server plans, logs and voices the
    alert and sends nothing.

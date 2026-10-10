@@ -59,6 +59,8 @@ if [ -z "${EIP_ALLOC:-}" ]; then
   aws ec2 associate-address --instance-id "$INSTANCE_ID" --allocation-id "$EIP_ALLOC" >/dev/null
 fi
 save PUBLIC_IP "$(aws ec2 describe-addresses --allocation-ids "$EIP_ALLOC" --query 'Addresses[0].PublicIp' --output text)"
-save SITE_HOST "$(echo "$PUBLIC_IP" | tr . -).sslip.io"   # a hostname for the IP, so Caddy can get a certificate
+# AAHAT_SITE_HOST: your own domain (an A record pointing at this IP). Without one, sslip.io gives the IP a
+# hostname so Caddy can still get a certificate.
+save SITE_HOST "${AAHAT_SITE_HOST:-$(echo "$PUBLIC_IP" | tr . -).sslip.io}"
 
 echo "server: $PUBLIC_IP  site: https://$SITE_HOST  ssh: ssh -i $AAHAT_KEY_FILE ec2-user@$PUBLIC_IP"

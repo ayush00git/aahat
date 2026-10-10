@@ -3,7 +3,7 @@
 How to read Aahat's glacial-lake data and use its alert, assistant and researcher endpoints.
 The implementation notes (packages, environment variables, tests) are in [`api/README.md`](api/README.md).
 
-- **Base URL (demo server):** `https://15-206-138-242.sslip.io/api`
+- **Base URL (demo server):** `https://aahat.ayyush.dev/api`
 - **Format:** JSON in and out. Errors are `{"error": "..."}` with a fitting HTTP status.
 - **CORS:** open to any origin, so a browser app can call it directly.
 - **Auth:** reading data is public. Officials' routes need `Authorization: Bearer <token>`.
@@ -16,7 +16,7 @@ elevation model, not a hydraulic model. Aahat does not detect a burst as it happ
 predict when a lake will burst.
 
 ```bash
-API=https://15-206-138-242.sslip.io/api
+API=https://aahat.ayyush.dev/api
 ```
 
 ## Lakes

@@ -14,7 +14,9 @@ AAHAT_OPS_EMAIL=you@example.com ./ops-alerts.sh   # failure emails (SNS topic + 
 ```
 
 - Region `ap-south-1` (Mumbai), instance `t4g.small` (~$0.02/h). Override in `config.sh` or the environment.
-- The site is `https://<ip-with-dashes>.sslip.io`: villager app at `/`, officials' dashboard at `/officials/`,
+- The site is `https://<ip-with-dashes>.sslip.io` by default, or your own domain: point an A record at the
+  server's IP and set `SITE_HOST` in `.state` (`AAHAT_SITE_HOST` when provisioning), with the old name in
+  `SITE_ALIASES` to keep it working. The live site is `https://aahat.ayyush.dev`: villager app at `/`, officials' dashboard at `/officials/`,
   API at `/api/`. Caddy gets the certificate automatically.
 - Logs: `ssh -i ~/.ssh/aahat-ec2.pem ec2-user@<ip>` then `journalctl -u aahat-api -f` or
   `sudo tail -f /var/log/caddy-access.log`.

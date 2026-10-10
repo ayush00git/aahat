@@ -27,7 +27,8 @@ fi
 for app in ${AAHAT_WEB_APPS:-villager dashboard}; do
   [ -z "${AAHAT_SKIP_WEB:-}" ] && [ -d "$ROOT/web/$app/dist" ] && eval $RSYNC "$ROOT/web/$app/dist/" "ec2-user@$PUBLIC_IP:/tmp/aahat/web-$app/"
 done
-sed "s/{\$SITE_HOST}/$SITE_HOST/" Caddyfile.tmpl > /tmp/aahat-Caddyfile
+# SITE_ALIASES (optional, in .state): other hostnames that serve the same site, e.g. the old sslip.io name
+sed "s/{\$SITE_HOST}/$SITE_HOST/; s/{\$SITE_ALIASES}/${SITE_ALIASES:+, $SITE_ALIASES}/" Caddyfile.tmpl > /tmp/aahat-Caddyfile
 scp -q -i "$AAHAT_KEY_FILE" /tmp/aahat-Caddyfile "ec2-user@$PUBLIC_IP:/tmp/aahat/Caddyfile"
 scp -q -i "$AAHAT_KEY_FILE" aahat-api.service "ec2-user@$PUBLIC_IP:/tmp/aahat/"
 
