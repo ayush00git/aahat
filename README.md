@@ -171,6 +171,9 @@ drop = 1 − latest area / season area, against the latest season up to `--as-of
 `drained` is true only if the drop exceeds 30% and 3× the combined shoreline uncertainty of the two outlines,
 **and** that one scene observed at least 90% of the season outline's pixels. Cloud, cloud shadow and terrain
 shadow are unknown, never dry, so a cloud over the lake cannot look like a drained lake (`no_clear_scene`).
+Lakes smaller than 50,000 m² are not checked (`too_small`): at a few hundred pixels one scene differs from
+the season outline by tens of percent (Suraj Tal read 73% lower on 2026-10-05 while every larger lake
+stayed within 1%).
 If more than 20% of the outline is snow or ice the lake is freezing over, not emptying: `frozen_or_snow`,
 never flagged, and older scenes are not consulted either. Writes `out/lakes/<id>/drain.json` (season year and
 area, the latest scene's day, item id, area and coverage, drop, threshold, status, note) and a `drain`

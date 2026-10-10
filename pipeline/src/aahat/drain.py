@@ -44,6 +44,10 @@ class DrainParams:
     sigmas: float = 3.0  # ... and the drop must also beat this many combined uncertainties
     min_coverage: float = 0.9  # share of the season outline the latest scene must have observed
     max_snow: float = 0.2  # more of the outline than this under snow/ice: frozen, not drained
+    # A lake of a few hundred pixels changes by tens of percent between single scenes (edge pixels,
+    # shadow, first ice): Suraj Tal (22,600 m2) read 73% "lost" on 2026-10-05 while every lake above
+    # 50,000 m2 stayed within 1%. Below this size one scene cannot tell drainage from noise.
+    min_area_m2: float = 50_000.0
 
 
 @dataclass
@@ -204,6 +208,13 @@ def run_drain(
     season = season_baseline(lake_dir, as_of, grid)
     if season is not None:
         result |= {"season_year": season.year, "season_area_m2": season.area_m2}
+    if season is not None and season.area_m2 < p.min_area_m2:
+        result |= {
+            "status": "too_small",
+            "note": f"lake is smaller than {p.min_area_m2:,.0f} m2: one scene cannot tell drainage from noise",
+        }
+        season = None
+    if season is not None:
         scenes = find_scenes(to_wgs84(grid.polygon(), grid.crs), as_of - timedelta(days=p.lookback_days), as_of)
         seed = point_in_crs(lake.lon, lake.lat, grid.crs)
         look = latest_look(scenes, season, grid, Terrain(grid), seed, wp, p) if scenes else None

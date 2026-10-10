@@ -2,6 +2,7 @@ import json
 from datetime import date
 
 import numpy as np
+import pytest
 from affine import Affine
 from pyproj import CRS
 from shapely.geometry import box, mapping
@@ -115,3 +116,14 @@ def test_latest_look_skips_cloud_but_stops_at_snow(monkeypatch):
     scl_by_day.update({1: cloudy, 4: cloudy, 7: cloudy})
     assert drain.latest_look(scenes, season(), GRID, terrain, SEED).status == "no_clear_scene"
     assert drain.summarise(None, DrainParams())["status"] == "no_clear_scene"
+
+
+def test_a_lake_too_small_for_one_scene_is_never_checked(tmp_path, monkeypatch):
+    from aahat.lakes import load_lakes
+
+    lake = load_lakes()[0]
+    tiny = drain.Season(year=2026, area_m2=22_600.0, uncertainty_m2=4_700.0, outline=np.zeros((2, 2), bool))
+    monkeypatch.setattr(drain, "season_baseline", lambda *a, **k: tiny)
+    monkeypatch.setattr(drain, "find_scenes", lambda *a, **k: pytest.fail("no scene search for a tiny lake"))
+    r = drain.run_drain(lake, tmp_path)
+    assert r["status"] == "too_small" and r["drained"] is False and r["latest"] is None

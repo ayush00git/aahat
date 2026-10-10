@@ -20,6 +20,7 @@ const DRAIN_STATUS: Record<string, string> = {
   no_clear_scene: "no clear scene (cloud or no pass)",
   frozen_or_snow: "lake frozen or under snow, not assessed",
   not_found: "no full season outline to compare against",
+  too_small: "lake too small for a single-scene check",
 };
 
 /** "Last satellite check" from the index's drain summary; null when no check was run. */
