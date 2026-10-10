@@ -134,7 +134,7 @@ func TestToolLoopAnswersFromData(t *testing.T) {
 	if got := model.firstUserText(); !strings.Contains(got, "थिरोट गाँव") || !strings.Contains(got, "ऊँची जगह पर जाएँ") || strings.Contains(got, "place_osm") {
 		t.Errorf("user message %q", got)
 	}
-	if len(first.ToolConfig.Tools) != 5 || aws.ToInt32(first.InferenceConfig.MaxTokens) != defaultMaxTokens {
+	if len(first.ToolConfig.Tools) != 5 || aws.ToInt32(first.InferenceConfig.MaxTokens) != 1000 {
 		t.Errorf("tools = %d, max tokens = %d", len(first.ToolConfig.Tools), aws.ToInt32(first.InferenceConfig.MaxTokens))
 	}
 	if sys := first.System[0].(*types.SystemContentBlockMemberText).Value; !strings.Contains(sys, "in the same turn") || strings.Contains(sys, "%!") {
