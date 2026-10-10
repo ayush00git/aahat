@@ -1,0 +1,15 @@
+[Unit]
+Description=Aahat researcher jobs (pipeline run for a lake an official asked about)
+After=network-online.target
+[Service]
+Type=oneshot
+User=aahat
+ExecStart=/srv/aahat/bin/research-worker.sh
+TimeoutStartSec=12h
+Nice=10
+# 2 GB server shared with the API: past this the worker is stopped, not the API
+MemoryHigh=1100M
+MemoryMax=1500M
+[Install]
+# also once at boot, for jobs queued while the server was down
+WantedBy=multi-user.target

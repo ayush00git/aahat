@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/ayush00git/aahat/api/internal/alert"
+	"github.com/ayush00git/aahat/api/internal/assistant"
 	"github.com/ayush00git/aahat/api/internal/data"
 	"github.com/ayush00git/aahat/api/internal/httpapi"
 	"github.com/ayush00git/aahat/api/internal/store"
@@ -35,6 +36,12 @@ type Backends struct {
 	// OfficialToken, if set, is required as "Authorization: Bearer <token>" on officials' routes
 	// (trigger, subscriber list, alert log). Empty leaves them open (local development).
 	OfficialToken string
+
+	// Bedrock and BedrockModel (see Bedrock) turn on the /ask assistant, name lookup and summaries
+	// for researcher jobs. JobsDir (see JobsDir) turns on the researcher API; "" leaves it off.
+	Bedrock      assistant.Converser
+	BedrockModel string
+	JobsDir      string
 }
 
 // Handler builds the API handler.
@@ -48,7 +55,7 @@ func Handler(b Backends) http.Handler {
 		audioPath = b.Voice.Path
 	}
 	svc := alert.NewService(catalog, b.Store, b.Store, dispatcher)
-	return httpapi.New(httpapi.Config{
+	cfg := httpapi.Config{
 		Catalog:       catalog,
 		Store:         b.Store,
 		Alerts:        svc,
@@ -59,7 +66,13 @@ func Handler(b Backends) http.Handler {
 		OfficialAuth:  httpapi.BearerToken(b.OfficialToken),
 		// AAHAT_WEATHER_URL overrides the Open-Meteo forecast endpoint (tests, a proxy).
 		Weather: weather.NewService(weather.NewClient(os.Getenv("AAHAT_WEATHER_URL")), weather.DefaultTTL),
-	})
+	}
+	var api http.Handler
+	// The assistant's tools read through the API's own routes, so it is handed the finished handler.
+	self := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { api.ServeHTTP(w, r) })
+	cfg.Ask, cfg.Research = bedrockFeatures(b, catalog, self)
+	api = httpapi.New(cfg)
+	return api
 }
 
 // FromEnv picks backends from environment variables:
@@ -83,6 +96,10 @@ func FromEnv(ctx context.Context, log *slog.Logger) (Backends, error) {
 		return b, err
 	}
 	b.Notifier, b.Voice, b.PushPublicKey = notifier, speaker, pushKey
+	if b.Bedrock, b.BedrockModel, err = Bedrock(ctx); err != nil {
+		return b, err
+	}
+	b.JobsDir = os.Getenv("AAHAT_JOBS_DIR") // researcher jobs need the worker beside the API: off unless set
 	ttl := 5 * time.Minute
 	if v := os.Getenv("AAHAT_CACHE_TTL"); v != "" {
 		d, err := time.ParseDuration(v)

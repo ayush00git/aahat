@@ -48,6 +48,10 @@ func run(log *slog.Logger, addr, dataDir, storeFile string, cacheTTL time.Durati
 	if err != nil {
 		return err
 	}
+	bedrock, bedrockModel, err := app.Bedrock(context.Background())
+	if err != nil {
+		return err
+	}
 	handler := app.Handler(app.Backends{
 		Data:          data.NewCache(local, cacheTTL),
 		Store:         st,
@@ -57,6 +61,9 @@ func run(log *slog.Logger, addr, dataDir, storeFile string, cacheTTL time.Durati
 		Voice:         speaker,
 		PushPublicKey: pushKey,
 		OfficialToken: os.Getenv("AAHAT_OFFICIAL_TOKEN"),
+		Bedrock:       bedrock,
+		BedrockModel:  bedrockModel,
+		JobsDir:       app.JobsDir(filepath.Dir(storeFile)),
 	})
 
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}

@@ -29,6 +29,11 @@ type Config struct {
 
 	// Weather serves the Open-Meteo outlook and trigger level; nil makes the weather routes answer 503.
 	Weather *weather.Service
+
+	// Ask serves POST /ask, the villagers' question-answering assistant (Amazon Bedrock); nil makes it answer 503.
+	Ask http.Handler
+	// Research serves the officials' researcher jobs under /research/; nil leaves those routes out.
+	Research http.Handler
 }
 
 type server struct {
@@ -92,6 +97,20 @@ func New(cfg Config) http.Handler {
 	mux.Handle("POST /trigger", only(s.trigger))
 	mux.Handle("GET /events", only(s.listEvents))
 	mux.Handle("GET /events/{id}", only(s.getEvent))
+
+	// Assistant (public, rate-limited per client) and researcher jobs (officials).
+	ask := cfg.Ask
+	if ask == nil {
+		ask = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			writeError(w, http.StatusServiceUnavailable, "the assistant is not configured")
+		})
+	}
+	mux.Handle("POST /ask", ask)
+	if cfg.Research != nil {
+		for _, route := range []string{"POST /research/lakes", "GET /research/jobs", "GET /research/jobs/{id}"} {
+			mux.Handle(route, official(cfg.Research))
+		}
+	}
 
 	// Sensors authenticate with an HMAC signature instead.
 	mux.HandleFunc("POST /webhook/sensor", s.sensorWebhook)

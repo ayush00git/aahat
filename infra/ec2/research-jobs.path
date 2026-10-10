@@ -1,0 +1,7 @@
+[Unit]
+Description=Start the Aahat research worker when a job file is written
+[Path]
+PathChanged=/srv/aahat/state/jobs
+Unit=research-worker.service
+[Install]
+WantedBy=paths.target
