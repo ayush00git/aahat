@@ -159,6 +159,13 @@ export const IconSend = (p: P) => (
   </Svg>
 );
 
+export const IconMic = (p: P) => (
+  <Svg {...p}>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+  </Svg>
+);
+
 export const IconPause = (p: P) => (
   <Svg {...p} fill>
     <path d="M6 4h4v16H6zM14 4h4v16h-4z" />

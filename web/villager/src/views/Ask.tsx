@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError, ask, url, type AskAnswer } from '../api';
 import { useI18n } from '../i18n';
-import { IconPause, IconPlay, IconSend } from './icons';
+import { listen, speechSupported, type Listener } from '../speech';
+import { IconMic, IconPause, IconPlay, IconSend } from './icons';
 
 const MAX_LEN = 500;
 
@@ -51,6 +52,30 @@ export function Ask({ osm }: { osm?: string }) {
     }
   };
 
+  // Voice input: the transcript fills the box as it is heard and is sent when the speaker stops.
+  const [listening, setListening] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  const listener = useRef<Listener | null>(null);
+  const canSpeak = speechSupported();
+  useEffect(() => () => listener.current?.abort(), []);
+  const toggleMic = () => {
+    if (listening) return listener.current?.stop();
+    setMicError(null);
+    const started = listen(
+      lang === 'en' ? 'en' : 'hi',
+      (text) => setQ(text.slice(0, MAX_LEN)),
+      (text, error) => {
+        listener.current = null;
+        setListening(false);
+        if (text) return void send(text);
+        if (error) setMicError(error === 'denied' ? t.askMicDenied : error === 'nothing' ? t.askMicNothing : t.askMicError);
+      },
+    );
+    if (!started) return setMicError(t.askMicError);
+    listener.current = started;
+    setListening(true);
+  };
+
   // "Which lake threatens my village?" only makes sense with a village on screen.
   const examples = osm ? t.askExamples : t.askExamples.slice(1);
   const busy = state.kind === 'loading';
@@ -78,10 +103,34 @@ export function Ask({ osm }: { osm?: string }) {
           value={q}
           onInput={(e) => setQ((e.target as HTMLInputElement).value)}
         />
+        {canSpeak && (
+          <button
+            type="button"
+            class="btn btn-secondary ask-mic"
+            onClick={toggleMic}
+            disabled={busy}
+            aria-pressed={listening}
+            aria-label={listening ? t.askMicStop : t.askMic}
+            title={listening ? t.askMicStop : t.askMic}
+          >
+            <IconMic size={18} />
+          </button>
+        )}
         <button type="submit" class="btn btn-primary ask-send" disabled={busy || !q.trim()} aria-label={t.askSend}>
           <IconSend size={18} />
         </button>
       </form>
+
+      {listening && (
+        <p class="ask-listening" role="status">
+          {t.askListening}
+        </p>
+      )}
+      {micError && !listening && (
+        <p class="ask-error" role="status">
+          {micError}
+        </p>
+      )}
 
       <ul class="ask-examples" aria-label={t.askExamplesLabel}>
         {examples.map((ex) => (
