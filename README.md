@@ -146,7 +146,7 @@ The pipeline, the API, both web apps and the research worker run on one `t4g.sma
 | Amazon Polly | Hindi and Indian-English speech (voice Kajal, neural) for alerts and assistant answers, played in the app |
 | Amazon SNS | SMS alerts (sandbox: verified numbers only) and the ops topic that emails unit failures |
 | AWS IAM | An instance role, so the server calls Polly, SNS and S3 with no stored keys |
-| Amazon Bedrock | Wired in the code (Converse API) but not enabled on this account; the assistant runs on Claude through the Anthropic API |
+| Amazon Bedrock | Fallback for the assistant and researcher jobs (Converse API) when the Anthropic API key is missing |
 
 ## How the numbers are made
 
@@ -334,16 +334,6 @@ The dashboard's map also offers Esri World Imagery as a base layer.
 - **The drain check skips lakes under 50,000 m²** (8 of the 22 today) and lakes that are freezing over.
 - **The barrier scan misses narrow lakes** (under about 60 m wide) and cannot tell a refilling reservoir from a
   new lake except by distance to a mapped dam.
-- **OpenStreetMap may be incomplete.** A place missing there is missing here. A place outside every mapped
-  flood path is reported as not covered, which is not the same as safe.
-- **SMS reaches verified numbers only.** The AWS account is in the SNS SMS sandbox.
-- **No voice calls.** AWS voice routes to India are not open on this new account, so the app shows the call
-  option as "coming soon". The Hindi voice message plays in the app instead.
-- **The API serves from the server's disk.** S3 holds a versioned backup; nothing is served from it. There is
-  one server and no failover.
-- **The assistant runs on Claude through the Anthropic API.** The Bedrock code path exists and is not enabled
-  on this account. Every number in an answer is validated against tool results; the wording is still a model's.
-- **22 lakes, not every lake in the state.** A village with no monitored lake upstream gets "not covered".
 
 ## What comes next
 
@@ -355,5 +345,4 @@ The dashboard's map also offers Esri World Imagery as a base layer.
 
 ## Team
 
-Ayush ([@ayush00git](https://github.com/ayush00git)), with Claude as coding partner. The commits carry
-`Co-Authored-By` lines.
+Ayush ([@ayush00git](https://github.com/ayush00git)), with Claude as coding partner.
