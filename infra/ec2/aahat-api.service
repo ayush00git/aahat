@@ -1,6 +1,7 @@
 [Unit]
 Description=Aahat API
 After=network-online.target
+OnFailure=aahat-notify-failure@%n.service
 [Service]
 User=aahat
 EnvironmentFile=/srv/aahat/api.env

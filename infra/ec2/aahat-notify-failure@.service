@@ -1,0 +1,9 @@
+[Unit]
+Description=Email the ops topic that %i failed
+[Service]
+Type=oneshot
+User=aahat
+# journalctl -u needs to read the system journal
+SupplementaryGroups=systemd-journal
+Environment=HOME=/srv/aahat
+ExecStart=/srv/aahat/bin/notify-failure.sh %i

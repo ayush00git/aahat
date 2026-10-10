@@ -1,0 +1,7 @@
+[Unit]
+Description=Aahat S3 backup daily (subscriptions change between pipeline refreshes)
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Aahat backup of data and state to S3
+After=network-online.target
+OnFailure=aahat-notify-failure@%n.service
+[Service]
+Type=oneshot
+User=aahat
+ExecStart=/srv/aahat/bin/s3-sync.sh
+TimeoutStartSec=30min

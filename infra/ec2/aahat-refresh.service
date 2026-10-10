@@ -1,6 +1,7 @@
 [Unit]
 Description=Aahat pipeline refresh (new Sentinel-2 scenes -> risk -> downstream)
 After=network-online.target
+OnFailure=aahat-notify-failure@%n.service
 [Service]
 Type=oneshot
 User=aahat

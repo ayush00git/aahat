@@ -19,4 +19,6 @@ done
 for lake in $LAKES; do
   /srv/aahat/.local/bin/uv run --frozen aahat barrier --lake "$lake" --max-km 60 --out "$OUT" || echo "barrier scan failed: $lake"
 done
+# Back up data and state to the data bucket; a failed backup must not fail the refresh
+/srv/aahat/bin/s3-sync.sh || echo "s3 sync failed"
 echo "refreshed $(date -u +%FT%TZ)"
