@@ -1,5 +1,5 @@
 import { useMemo, useState } from "preact/hooks";
-import { arrival, dateOnly, discharge, DASH, KIND_LABEL, num, STATUS_LABEL, subkind, volume } from "../format";
+import { arrival, dateOnly, discharge, DASH, KIND_LABEL, kmRange, num, STATUS_LABEL, subkind, unnamedLabel, volume } from "../format";
 import type { BarrierCandidate, BarrierScan, DownstreamFile, Impact, ImpactKind, Lake, ScenarioName } from "../types";
 import { MoreToggle, Section, SourceText, StatusBadge } from "./ui";
 
@@ -14,6 +14,52 @@ function pair(a: number | null | undefined, b: number | null | undefined, signed
   if ((a === null || a === undefined) && (b === null || b === undefined)) return DASH;
   // The zero-width space after the slash lets the pair wrap onto two lines in a narrow panel.
   return `${f(a)} /\u200b${f(b)}`;
+}
+
+/** One table row: an asset, or a run of neighbouring assets that read the same. */
+interface Row {
+  first: Impact;
+  n: number;
+  kmMax: number | null;
+  fast: number | null;
+  expected: number | null;
+}
+
+/** Rows within this distance of the first one of a run are folded into it. */
+const MERGE_KM = 1;
+
+/**
+ * Folds consecutive assets with the same name, kind, sub-kind and status that
+ * lie within MERGE_KM of the run's first one (OpenStreetMap splits one road or
+ * bridge into several pieces) into one row. No value is changed: the row shows
+ * the km range, the earliest fast and the latest expected arrival, and a count.
+ */
+function mergeRows(items: Impact[]): Row[] {
+  const out: Row[] = [];
+  for (const im of items) {
+    const g = out[out.length - 1];
+    const a = g?.first;
+    if (
+      a &&
+      a.kind === im.kind &&
+      a.status === im.status &&
+      (a.name ?? null) === (im.name ?? null) &&
+      (a.name_hi ?? null) === (im.name_hi ?? null) &&
+      (a.subkind ?? "") === (im.subkind ?? "") &&
+      a.km !== null &&
+      im.km !== null &&
+      Math.abs(im.km - a.km) <= MERGE_KM
+    ) {
+      g.n++;
+      g.kmMax = Math.max(g.kmMax ?? im.km, im.km);
+      if (im.arrival_min_fast !== null) g.fast = g.fast === null ? im.arrival_min_fast : Math.min(g.fast, im.arrival_min_fast);
+      if (im.arrival_min_expected !== null)
+        g.expected = g.expected === null ? im.arrival_min_expected : Math.max(g.expected, im.arrival_min_expected);
+    } else {
+      out.push({ first: im, n: 1, kmMax: im.km, fast: im.arrival_min_fast, expected: im.arrival_min_expected });
+    }
+  }
+  return out;
 }
 
 /** New water on the river below the lake: a landslide dam would show up here first. */
@@ -108,6 +154,12 @@ export function ExposureTab({
     return m;
   }, [rows]);
   const shown = kinds.size ? rows.filter((r) => kinds.has(r.kind)) : rows;
+  // "More columns" lists every asset on its own row, with its own depth figures.
+  const tableRows = useMemo(
+    () => (more ? shown.map((im): Row => ({ first: im, n: 1, kmMax: im.km, fast: im.arrival_min_fast, expected: im.arrival_min_expected })) : mergeRows(shown)),
+    [rows, kinds, more],
+  );
+  const merged = tableRows.some((r) => r.n > 1);
   const toggle = (k: ImpactKind) => {
     const n = new Set(kinds);
     if (n.has(k)) n.delete(k);
@@ -197,7 +249,7 @@ export function ExposureTab({
             )}
             {ds?.first_settlement && (
               <li>
-                <span class="k">First settlement</span> {ds.first_settlement.name ?? "unnamed"}
+                <span class="k">First settlement</span> {ds.first_settlement.name ?? unnamedLabel("settlement")}
                 {ds.first_settlement.name_hi ? ` (${ds.first_settlement.name_hi})` : ""} at{" "}
                 {num(ds.first_settlement.km, 1)} km,{" "}
                 {arrival(ds.first_settlement.arrival_min_fast, ds.first_settlement.arrival_min_expected)}
@@ -276,14 +328,21 @@ export function ExposureTab({
               </tr>
             </thead>
             <tbody>
-              {shown.map((im, i) => {
+              {tableRows.map((row, i) => {
+                const im = row.first;
                 const e = im.scenarios?.expected;
                 const s = im.scenarios?.severe;
                 return (
-                  <tr key={`${im.osm}-${i}`} class="clickable" onClick={() => onFocus(im)} title="Show on map">
-                    <td class="num">{num(im.km, 1)}</td>
+                  <tr
+                    key={`${im.osm}-${i}`}
+                    class="clickable"
+                    onClick={() => onFocus(im)}
+                    title={row.n > 1 ? `${row.n} mapped pieces, ${kmRange(im.km, row.kmMax).replace("\u200b", "")} km. Show the nearest on the map` : "Show on map"}
+                  >
+                    <td class="num">{row.n > 1 ? kmRange(im.km, row.kmMax) : num(im.km, 1)}</td>
                     <td>
-                      <span class="cell-name">{im.name ?? <span class="muted">unnamed</span>}</span>
+                      <span class="cell-name">{im.name ?? <span class="muted">{unnamedLabel(im.kind)}</span>}</span>
+                      {row.n > 1 && <span class="muted small"> ×{row.n}</span>}
                       {im.name_hi && (
                         <span class="hi block" lang="hi">
                           {im.name_hi}
@@ -298,9 +357,9 @@ export function ExposureTab({
                       <StatusBadge status={im.status} short />
                     </td>
                     <td class="num nowrap">
-                      {im.arrival_min_fast === null && im.arrival_min_expected === null
+                      {row.fast === null && row.expected === null
                         ? DASH
-                        : arrival(im.arrival_min_fast, im.arrival_min_expected).replace(" min", "").replace("~", "")}
+                        : arrival(row.fast, row.expected).replace(" min", "").replace("~", "")}
                     </td>
                     {more && <td class="num pair">{pair(e?.flood_depth_m, s?.flood_depth_m)}</td>}
                     {more && <td class="num pair">{pair(e?.height_above_flood_m, s?.height_above_flood_m, true)}</td>}
@@ -320,6 +379,7 @@ export function ExposureTab({
         <p class="caption">
           {STATUS_LABEL.in_flood_path}: flooded in the expected scenario. {STATUS_LABEL.at_risk}: flooded only in the
           severe scenario, or just above it. Click a row to show it on the map.
+          {merged && " ×N: N neighbouring map pieces with the same name, kind and status, shown as one row with their km range; More columns lists each one."}
         </p>
       </Section>
 

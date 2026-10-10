@@ -38,7 +38,7 @@ export function LakeList({
               class={`lake-row${l.id === selectedId ? " selected" : ""}`}
               onClick={() => onSelect(l.id)}
               aria-current={l.id === selectedId ? "true" : undefined}
-              title={`${l.district} · ${l.kind}${wx ? `\n${wxTitle}` : ""}`}
+              title={`${l.name}${l.name_hi ? ` · ${l.name_hi}` : ""}\n${l.district} · ${l.kind}${wx ? `\n${wxTitle}` : ""}`}
             >
               <span class="lake-main">
                 <span class="lake-name-row">

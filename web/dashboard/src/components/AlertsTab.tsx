@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, ApiError } from "../api";
 import { requireSignIn, useAuth } from "../auth";
-import { arrival, dateTime, discharge, KIND_LABEL, metres, num, OUTCOME_LABEL, signedMetres } from "../format";
+import { arrival, dateTime, discharge, KIND_LABEL, metres, num, OUTCOME_LABEL, signedMetres, unnamedLabel } from "../format";
 import type { AlertEvent, DownstreamFile, Lake, ScenarioName } from "../types";
 import { ErrorMsg, Loading, MoreToggle, Section, StatusBadge } from "./ui";
 
@@ -192,7 +192,7 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
                   <td class="num">{i + 1}</td>
                   <td class="num">{num(p.km, 1)}</td>
                   <td>
-                    {p.name ?? <span class="muted">unnamed</span>}
+                    {p.name ?? <span class="muted">{unnamedLabel(p.kind)}</span>}
                     {p.name_hi && (
                       <span class="hi" lang="hi">
                         {" "}

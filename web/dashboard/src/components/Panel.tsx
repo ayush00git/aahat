@@ -1,4 +1,4 @@
-import { dateOnly, km2, num } from "../format";
+import { dateOnly, km2, num, staleDataYear } from "../format";
 import type { BarrierScan, DownstreamFile, Impact, Lake, LakeLayers, RiskFile, WeatherOutlook } from "../types";
 import { AlertsTab } from "./AlertsTab";
 import { EvidenceTab } from "./EvidenceTab";
@@ -53,6 +53,8 @@ export function Panel({
   const ds = lake.downstream;
   const drain = lake.drain;
   const settlements = ds?.exposed_counts?.settlement;
+  // Lakes hidden by cloud or snow in recent seasons: say so, or the old year reads as a bug.
+  const staleYear = staleDataYear(lake.risk?.data_until);
   return (
     <aside class="panel" aria-label={`${lake.name} details`}>
       <header class="panel-head">
@@ -84,7 +86,18 @@ export function Panel({
           </div>
           <div>
             <dt>Area ({lake.latest?.year ?? "—"})</dt>
-            <dd>{km2(lake.latest?.area_m2)}</dd>
+            <dd>
+              {km2(lake.latest?.area_m2)}
+              {staleYear !== null && (
+                <span
+                  class="muted small"
+                  title={`No clear satellite view of this lake since ${dateOnly(lake.risk?.data_until)} (cloud or snow in later seasons).`}
+                >
+                  {" "}
+                  · last clear data: {staleYear}
+                </span>
+              )}
+            </dd>
           </div>
           <div>
             <dt>Settlements</dt>

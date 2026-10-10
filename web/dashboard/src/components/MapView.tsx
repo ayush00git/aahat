@@ -123,12 +123,13 @@ export function MapView({
     if (!playing || !years.length) return;
     const t = setInterval(() => {
       setYear((cur) => {
-        const i = years.findIndex((y) => y.year === cur);
-        if (i < 0 || i >= years.length - 1) {
+        // The next recorded year after the current one (the slider can rest on a year without a record).
+        const next = years.find((y) => cur === null || y.year > cur);
+        if (!next) {
           setPlaying(false);
           return cur;
         }
-        return years[i + 1].year;
+        return next.year;
       });
     }, PLAY_MS);
     return () => clearInterval(t);
@@ -143,7 +144,8 @@ export function MapView({
 
   const togglePlay = () => {
     if (!years.length) return;
-    if (!playing && year === years[years.length - 1].year) setYear(years[0].year);
+    // From the last year (or beyond): start over from the first and play through.
+    if (!playing && (year === null || year >= years[years.length - 1].year)) setYear(years[0].year);
     setPlaying(!playing);
   };
 

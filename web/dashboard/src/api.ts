@@ -11,7 +11,7 @@ import type {
   WeatherBrief,
   WeatherOutlook,
 } from "./types";
-import { getToken, requireSignIn } from "./auth";
+import { getToken, rejectToken, requireSignIn } from "./auth";
 
 // VITE_API_BASE: "/api" (default; proxied to the Go API by Vite in dev) or a
 // full URL such as https://api.example.org. The API allows any origin.
@@ -50,6 +50,7 @@ async function request<T>(path: string, init?: RequestInit, official = false): P
       /* not JSON */
     }
     if (official && res.status === 401) {
+      if (token) rejectToken(token);
       requireSignIn(token ? "The stored token was not accepted." : "This server requires an officials' token.");
     }
     throw new ApiError(res.status, msg);
@@ -59,8 +60,28 @@ async function request<T>(path: string, init?: RequestInit, official = false): P
 
 const enc = encodeURIComponent;
 
+/**
+ * Asks the server whether it accepts `token`, before it is stored: GET /events
+ * with the bearer token (the lake filter matches nothing, so the answer is
+ * small). True on 200, false on 401; anything else throws.
+ */
+async function checkToken(token: string): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/events?lake_id=${enc("-signin-check-")}`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    });
+  } catch (e) {
+    throw new ApiError(0, `API unreachable at ${BASE} (${(e as Error).message})`);
+  }
+  if (res.status === 401 || res.status === 403) return false;
+  if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`.trim());
+  return true;
+}
+
 export const api = {
   base: BASE,
+  checkToken,
   lakes: () => request<LakeIndex>("/lakes"),
   risk: (id: string) => request<RiskFile>(`/lakes/${enc(id)}/risk`),
   downstream: (id: string) => request<DownstreamFile>(`/lakes/${enc(id)}/downstream`),

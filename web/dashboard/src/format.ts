@@ -3,8 +3,10 @@
 
 import type { ImpactKind, ImpactStatus, RiskLevel, WeatherLevel, YearStatus } from "./types";
 
+// One digit grouping everywhere: international (1,234,567), never the Indian
+// lakh grouping (12,34,567). Dates below keep the day-month-year order.
 const nf = (digits: number) =>
-  new Intl.NumberFormat("en-IN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 export const DASH = "—";
 
@@ -125,6 +127,41 @@ export const KIND_LABEL: Record<ImpactKind, string> = {
   school: "School",
   health: "Health",
 };
+
+const UNNAMED_LABEL: Record<ImpactKind, string> = {
+  settlement: "Unnamed settlement",
+  bridge: "Unnamed bridge",
+  road: "Unnamed road",
+  hydro: "Unnamed hydro site",
+  school: "Unnamed school",
+  health: "Unnamed health facility",
+};
+
+/** What to show for an asset OpenStreetMap has no name for. */
+export function unnamedLabel(kind: ImpactKind): string {
+  return UNNAMED_LABEL[kind] ?? "Unnamed";
+}
+
+/** "11.5" or "11.5–12.2" (no unit) for a run of assets along the flood path. */
+export function kmRange(lo: number | null | undefined, hi: number | null | undefined, digits = 1): string {
+  const a = num(lo, digits);
+  const b = num(hi, digits);
+  // The zero-width space lets the range wrap in a narrow column.
+  return a === b ? a : `${a}–\u200b${b}`;
+}
+
+/**
+ * The year of `dataUntil` when it lies more than `months` before today, else
+ * null: marks lakes whose last clear satellite season is old.
+ */
+export function staleDataYear(dataUntil: string | null | undefined, months = 18, now = new Date()): number | null {
+  if (!dataUntil) return null;
+  const d = new Date(dataUntil.length === 10 ? dataUntil + "T00:00:00Z" : dataUntil);
+  if (Number.isNaN(d.getTime())) return null;
+  const cutoff = new Date(now.getTime());
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - months);
+  return d < cutoff ? d.getUTCFullYear() : null;
+}
 
 export const YEAR_STATUS_LABEL: Record<YearStatus, string> = {
   ok: "full coverage",
