@@ -130,6 +130,12 @@ Response: `{"answer", "lang", "sources": [{"tool", "args"}], "audio_url", "mode"
 
 Alerts go to the villages nearest the lake first, each with its own arrival time.
 
+`POST /trigger` body: `lake_id` (required), `scenario` (`severe` by default, or `expected`), `dry_run`,
+`source` (`simulation` by default, `sensor`, or `satellite_drain_check`) and a free-text `note` of at most
+300 characters. `source` and `note` are stored on the event and returned by `GET /events`. The server
+raises a `satellite_drain_check` alert itself when a lake newly shows as drained; that source is only
+accepted with `"dry_run": true`, so officials review it before anything is sent.
+
 ```bash
 curl -X POST $API/trigger -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"lake_id": "gepang-gath", "dry_run": true}'

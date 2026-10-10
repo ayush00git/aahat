@@ -28,6 +28,12 @@ const (
 
 	SourceSimulation = "simulation"
 	SourceSensor     = "sensor"
+	// SourceDrainCheck marks an alert raised by the server's refresh job when
+	// the satellite drain check flags a lake. Always a dry run: officials
+	// decide whether to send it.
+	SourceDrainCheck = "satellite_drain_check"
+
+	MaxNoteLen = 300 // characters
 
 	DeliveryPending = "pending"
 	DeliverySent    = "sent"

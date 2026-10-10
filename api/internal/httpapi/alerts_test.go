@@ -160,12 +160,46 @@ func TestTriggerPlan(t *testing.T) {
 	}
 }
 
+// The refresh job raises a dry run when the satellite drain check flags a lake:
+// the source and note are kept on the event and nothing is sent.
+func TestDrainCheckTrigger(t *testing.T) {
+	env := newEnv(t, nil)
+	subscribe(t, env, "hi", bhiyari, thirot)
+	note := "Area fell 42% between the 2026 season outline and the scene of 2026-10-08 (S2B_43SGS_20261008_0_L2A)"
+	r := env.do(t, "POST", "/trigger", map[string]any{
+		"lake_id": "gepang-gath", "source": "satellite_drain_check", "note": note, "dry_run": true,
+	})
+	expectStatus(t, r, 201)
+	ev := decode[alert.Event](t, r)
+	if ev.Source != alert.SourceDrainCheck || ev.Note != note || !ev.DryRun || len(ev.Recipients) != 2 {
+		t.Errorf("event = %+v", ev)
+	}
+	for _, rc := range ev.Recipients {
+		if rc.Delivery.Status != alert.DeliveryDryRun {
+			t.Errorf("delivery = %+v", rc.Delivery)
+		}
+	}
+	if sent := env.notifier.Sent(); len(sent) != 0 {
+		t.Errorf("dry run sent %d messages", len(sent))
+	}
+	evs := decode[[]alert.Event](t, env.do(t, "GET", "/events?lake_id=gepang-gath", nil))
+	if len(evs) != 1 || evs[0].Source != alert.SourceDrainCheck || evs[0].Note != note || !evs[0].DryRun {
+		t.Errorf("logged events = %+v", evs)
+	}
+}
+
 func TestTriggerErrors(t *testing.T) {
 	env := newEnv(t, nil)
 	expectError(t, env.do(t, "POST", "/trigger", map[string]any{"lake_id": "nope"}), 404)
 	expectError(t, env.do(t, "POST", "/trigger", map[string]any{"lake_id": "gepang-gath", "scenario": "worst"}), 400)
 	expectError(t, env.do(t, "POST", "/trigger", map[string]any{"lake_id": "gepang-gath", "source": "rumour"}), 400)
 	expectError(t, env.do(t, "POST", "/trigger", map[string]any{}), 400)
+	expectError(t, env.do(t, "POST", "/trigger", map[string]any{"lake_id": "gepang-gath", "note": strings.Repeat("x", 301)}), 400)
+	// The drain check may only plan an alert, never send one.
+	expectError(t, env.do(t, "POST", "/trigger", map[string]any{"lake_id": "gepang-gath", "source": "satellite_drain_check"}), 400)
+	if sent := env.notifier.Sent(); len(sent) != 0 {
+		t.Errorf("rejected triggers sent %d messages", len(sent))
+	}
 	expectError(t, env.do(t, "GET", "/events/evt_missing", nil), 404)
 }
 

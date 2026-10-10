@@ -50,8 +50,13 @@ function AudioButton({ url }: { url: string }) {
   );
 }
 
+/** Events the server's refresh job raises itself when the satellite drain check flags a lake. */
+const DRAIN_CHECK = "satellite_drain_check";
+const DRAIN_CHECK_LABEL = "Raised automatically by the satellite drain check.";
+
 function SourceTag({ source }: { source: string }) {
   if (source === "simulation") return <span class="tag sim">SIMULATION</span>;
+  if (source === DRAIN_CHECK) return <span class="tag sim">SATELLITE CHECK</span>;
   return <span class="tag live">{source.toUpperCase()}</span>;
 }
 
@@ -124,6 +129,9 @@ export function PlanView({ ev, requestedDry }: { ev: AlertEvent; requestedDry?: 
         </span>
         <span class="muted small">{ev.event_id}</span>
       </div>
+      {ev.source === DRAIN_CHECK && (
+        <p class="small">{DRAIN_CHECK_LABEL} Nothing was sent: review it, then raise a live alert if it is real.</p>
+      )}
       {ev.note && <p class="small">Note: {ev.note}</p>}
       {ev.sensor && (
         <p class="small">
@@ -280,6 +288,11 @@ function EventRow({ ev }: { ev: AlertEvent }) {
           {ev.summary.failed ? ` · ${ev.summary.failed} failed` : ""}
           {eventMode(ev) === "dry" ? " · not sent" : ""}
         </span>
+        {ev.source === DRAIN_CHECK && !open && (
+          <span class="muted small event-why">
+            {DRAIN_CHECK_LABEL} {ev.note}
+          </span>
+        )}
       </button>
       {open && (err ? <ErrorMsg msg={err} /> : full ? <PlanView ev={full} /> : <Loading what="event" />)}
     </li>

@@ -286,7 +286,7 @@ export interface AlertEvent {
   lake_name: string;
   lake_name_hi: string;
   scenario: ScenarioName;
-  source: "simulation" | "sensor" | string;
+  source: "simulation" | "sensor" | "satellite_drain_check" | string;
   /** True when the trigger asked for a dry run (newer API). */
   dry_run?: boolean;
   note?: string;

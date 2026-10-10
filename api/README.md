@@ -45,7 +45,7 @@ Officials (`Authorization: Bearer $AAHAT_OFFICIAL_TOKEN` when the token is set)
 | Route | Returns |
 | --- | --- |
 | `GET /subscriptions` | Subscriber list |
-| `POST /trigger` | Raise an alert for a lake |
+| `POST /trigger` | Raise an alert for a lake. Body: `lake_id`, `scenario`, `dry_run`, `source` (`simulation`, `sensor` or `satellite_drain_check`, which must be a dry run) and `note` (at most 300 characters); both are kept on the event |
 | `GET /events` | Alert log |
 | `GET /events/{id}` | One alert with its deliveries |
 

@@ -23,6 +23,8 @@ done
 for lake in $LAKES; do
   /srv/aahat/.local/bin/uv run --frozen aahat drain --lake "$lake" --out "$OUT" || echo "drain check failed: $lake"
 done
+# A newly drained lake raises a dry-run alert for officials to review; nothing is sent from here
+/srv/aahat/bin/drain-alert.sh "$OUT" || echo "drain alert failed"
 # Back up data and state to the data bucket; a failed backup must not fail the refresh
 /srv/aahat/bin/s3-sync.sh || echo "s3 sync failed"
 echo "refreshed $(date -u +%FT%TZ)"

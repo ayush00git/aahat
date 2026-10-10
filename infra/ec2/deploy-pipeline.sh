@@ -9,7 +9,7 @@ SSHOPT="-i $AAHAT_KEY_FILE -o StrictHostKeyChecking=accept-new"
 ssh $SSHOPT "ec2-user@$PUBLIC_IP" 'sudo mkdir -p /tmp/aahat-pipeline && sudo chown -R ec2-user /tmp/aahat-pipeline'
 rsync -az --delete -e "ssh $SSHOPT" --exclude .venv --exclude out --exclude '__pycache__' --exclude .pytest_cache --exclude .ruff_cache \
   "$ROOT/pipeline/" "ec2-user@$PUBLIC_IP:/tmp/aahat-pipeline/"
-scp -q $SSHOPT refresh.sh aahat-refresh.service aahat-refresh.timer "ec2-user@$PUBLIC_IP:/tmp/aahat-pipeline/"
+scp -q $SSHOPT refresh.sh drain-alert.sh aahat-refresh.service aahat-refresh.timer "ec2-user@$PUBLIC_IP:/tmp/aahat-pipeline/"
 ssh $SSHOPT "ec2-user@$PUBLIC_IP" bash -s <<'REMOTE'
 set -euo pipefail
 sudo rsync -a --delete --exclude .venv /tmp/aahat-pipeline/ /srv/aahat/pipeline/  # keep the venv: running jobs use it
@@ -20,6 +20,7 @@ if ! swapon --show | grep -q swapfile; then
   echo '/swapfile none swap defaults 0 0' | sudo tee -a /etc/fstab >/dev/null
 fi
 sudo install -m 755 /tmp/aahat-pipeline/refresh.sh /srv/aahat/bin/refresh.sh
+sudo install -m 755 /tmp/aahat-pipeline/drain-alert.sh /srv/aahat/bin/drain-alert.sh
 sudo install -m 644 /tmp/aahat-pipeline/aahat-refresh.service /tmp/aahat-pipeline/aahat-refresh.timer /etc/systemd/system/
 sudo chown -R aahat:aahat /srv/aahat
 if [ ! -x /srv/aahat/.local/bin/uv ]; then

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ayush00git/aahat/api/internal/data"
 )
@@ -55,8 +56,18 @@ func (s *Service) Trigger(ctx context.Context, req TriggerRequest) (*Event, erro
 	if req.Source == "" {
 		req.Source = SourceSimulation
 	}
-	if req.Source != SourceSimulation && req.Source != SourceSensor {
-		return nil, invalid(`source must be "simulation" or "sensor"`)
+	switch req.Source {
+	case SourceSimulation, SourceSensor:
+	case SourceDrainCheck:
+		// Raised by a machine with nobody watching: never sends on its own.
+		if !req.DryRun {
+			return nil, invalid(`source "satellite_drain_check" requires "dry_run": true`)
+		}
+	default:
+		return nil, invalid(`source must be "simulation", "sensor" or "satellite_drain_check"`)
+	}
+	if utf8.RuneCountInString(req.Note) > MaxNoteLen {
+		return nil, invalid("note must be at most %d characters", MaxNoteLen)
 	}
 	if req.LakeID == "" {
 		return nil, invalid("lake_id is required")

@@ -29,6 +29,11 @@ AAHAT_OPS_EMAIL=you@example.com ./ops-alerts.sh   # failure emails (SNS topic + 
 - The pipeline runs on the server: `systemctl list-timers aahat-refresh.timer`, logs with
   `journalctl -u aahat-refresh`, start one now with `sudo systemctl start aahat-refresh`. It writes to
   `/srv/aahat/data` (lakes, places, barrier scans), which the API serves.
+- After the drain checks, `refresh.sh` runs `/srv/aahat/bin/drain-alert.sh`: a lake whose `drain.json` says
+  `drained: true` gets a dry-run `POST /trigger` (source `satellite_drain_check`) so officials see it in the
+  dashboard's alert log; nothing is sent. Each scene raises once, remembered in
+  `/srv/aahat/state/drain-alerted/<lake id>` (delete the file to raise it again). By hand:
+  `sudo -u aahat /srv/aahat/bin/drain-alert.sh /srv/aahat/data`.
 
 ## Ops alerts
 
