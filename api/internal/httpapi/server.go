@@ -9,6 +9,7 @@ import (
 	"github.com/ayush00git/aahat/api/internal/alert"
 	"github.com/ayush00git/aahat/api/internal/data"
 	"github.com/ayush00git/aahat/api/internal/store"
+	"github.com/ayush00git/aahat/api/internal/weather"
 )
 
 type Config struct {
@@ -25,6 +26,9 @@ type Config struct {
 	PushPublicKey string
 	// AudioPath maps an /audio/{name} request to a file of spoken warnings; nil disables /audio.
 	AudioPath func(name string) string
+
+	// Weather serves the Open-Meteo outlook and trigger level; nil makes the weather routes answer 503.
+	Weather *weather.Service
 }
 
 type server struct {
@@ -35,6 +39,8 @@ type server struct {
 	log           *slog.Logger
 	pushKey       string
 	audioPath     func(string) string
+
+	weather *weather.Service
 }
 
 // New returns the API's root handler.
@@ -44,6 +50,7 @@ func New(cfg Config) http.Handler {
 		webhookSecret: cfg.WebhookSecret, log: cfg.Logger,
 		pushKey: cfg.PushPublicKey, audioPath: cfg.AudioPath,
 	}
+	s.weather = cfg.Weather
 	if s.log == nil {
 		s.log = slog.New(slog.DiscardHandler)
 	}
@@ -63,6 +70,12 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /lakes/{id}/downstream", s.lakeFile("downstream.json"))
 	mux.HandleFunc("GET /lakes/{id}/impacts", s.lakeImpacts)
 	mux.HandleFunc("GET /lakes/{id}/layers/{name}", s.lakeLayer)
+
+	// Weather trigger (Open-Meteo) and barrier-lake scans.
+	mux.HandleFunc("GET /lakes/{id}/weather", s.lakeWeather)
+	mux.HandleFunc("GET /weather", s.weatherAll)
+	mux.HandleFunc("GET /lakes/{id}/barrier", s.lakeBarrier)
+	mux.HandleFunc("GET /barrier", s.listBarriers)
 
 	// Villager app.
 	mux.HandleFunc("GET /places/search", s.searchPlaces)

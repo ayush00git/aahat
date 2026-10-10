@@ -21,6 +21,7 @@ import (
 	"github.com/ayush00git/aahat/api/internal/httpapi"
 	"github.com/ayush00git/aahat/api/internal/store"
 	"github.com/ayush00git/aahat/api/internal/voice"
+	"github.com/ayush00git/aahat/api/internal/weather"
 )
 
 type Backends struct {
@@ -56,6 +57,8 @@ func Handler(b Backends) http.Handler {
 		PushPublicKey: b.PushPublicKey,
 		AudioPath:     audioPath,
 		OfficialAuth:  httpapi.BearerToken(b.OfficialToken),
+		// AAHAT_WEATHER_URL overrides the Open-Meteo forecast endpoint (tests, a proxy).
+		Weather: weather.NewService(weather.NewClient(os.Getenv("AAHAT_WEATHER_URL")), weather.DefaultTTL),
 	})
 }
 

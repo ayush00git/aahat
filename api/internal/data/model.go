@@ -12,6 +12,8 @@ type Lake struct {
 	ID     string          `json:"id"`
 	Name   string          `json:"name"`
 	NameHi string          `json:"name_hi"`
+	Lat    *float64        `json:"lat"`
+	Lon    *float64        `json:"lon"`
 	Risk   *LakeRisk       `json:"risk"`
 	Raw    json.RawMessage `json:"-"`
 }

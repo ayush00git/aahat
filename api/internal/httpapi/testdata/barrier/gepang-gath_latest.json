@@ -1,0 +1,22 @@
+{
+ "reach": "gepang-gath",
+ "as_of": "2026-10-08",
+ "candidates": [
+  {
+   "kind": "possible_barrier_lake",
+   "km": 14.2,
+   "lon": 77.1021,
+   "lat": 32.4733,
+   "area_m2": 48200.0,
+   "near_dam_km": null
+  },
+  {
+   "kind": "reservoir_level_change",
+   "km": 61.5,
+   "lon": 76.71,
+   "lat": 32.66,
+   "area_m2": 120500.0,
+   "near_dam_km": 0.4
+  }
+ ]
+}

@@ -160,6 +160,9 @@ type Place struct {
 	Place  string  `json:"place"`
 	Lon    float64 `json:"lon"`
 	Lat    float64 `json:"lat"`
+	// District and State are absent from older indexes and null where the pipeline found none.
+	District *string `json:"district"`
+	State    *string `json:"state"`
 }
 
 // Places returns every searchable settlement, or an empty list if the index is not published yet.
@@ -185,4 +188,65 @@ func (c *Catalog) Places(ctx context.Context) ([]Place, error) {
 	}
 	c.places, c.placesRaw = doc.Places, b
 	return c.places, nil
+}
+
+// Place returns one settlement of the region-wide index, or nil if it is not listed.
+func (c *Catalog) Place(ctx context.Context, osm string) (*Place, error) {
+	places, err := c.Places(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range places {
+		if places[i].OSM == osm {
+			return &places[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// Barrier returns barrier/<id>_latest.json, the latest barrier-lake scan of the river below a
+// lake, for a lake in the index. Like LakeFile, ids that are not in the index never reach storage.
+func (c *Catalog) Barrier(ctx context.Context, id string) ([]byte, error) {
+	if _, err := c.Lake(ctx, id); err != nil {
+		return nil, err
+	}
+	return c.src.Get(ctx, barrierKey(id))
+}
+
+func barrierKey(id string) string { return "barrier/" + id + "_latest.json" }
+
+// BarrierScan is the part of a barrier file the API lists; candidates pass through unchanged.
+type BarrierScan struct {
+	LakeID     string          `json:"lake_id"`
+	AsOf       *string         `json:"as_of"`
+	Candidates json.RawMessage `json:"candidates"`
+}
+
+// Barriers returns the latest scan of every indexed lake that has one, in index order.
+// Lakes without a file, or with one that does not parse, are skipped.
+func (c *Catalog) Barriers(ctx context.Context) ([]BarrierScan, error) {
+	idx, err := c.Index(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []BarrierScan{}
+	for _, l := range idx.Lakes {
+		b, err := c.src.Get(ctx, barrierKey(l.ID))
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		scan := BarrierScan{}
+		if json.Unmarshal(b, &scan) != nil {
+			continue
+		}
+		scan.LakeID = l.ID
+		if len(scan.Candidates) == 0 || string(scan.Candidates) == "null" {
+			scan.Candidates = json.RawMessage("[]")
+		}
+		out = append(out, scan)
+	}
+	return out, nil
 }

@@ -19,6 +19,9 @@ type placeResult struct {
 	Lat    float64 `json:"lat"`
 	// Covered is true when at least one monitored lake's analysis includes the place.
 	Covered bool `json:"covered"`
+	// District and State come from the region-wide places index; null where it has none.
+	District *string `json:"district"`
+	State    *string `json:"state"`
 }
 
 // searchPlaces finds settlements by English or Hindi name across every lake's
@@ -42,21 +45,27 @@ func (s *server) searchPlaces(w http.ResponseWriter, r *http.Request) {
 	}
 	// Candidates: the analysed settlements (covered), then every other named place in the region.
 	var cands []placeResult
-	covered := map[string]bool{}
+	covered := map[string]int{} // osm -> index in cands
 	for _, li := range all {
 		for _, im := range li.Impacts {
-			if im.Kind != data.KindSettlement || covered[im.OSM] {
+			if im.Kind != data.KindSettlement {
 				continue
 			}
-			covered[im.OSM] = true
+			if _, seen := covered[im.OSM]; seen {
+				continue
+			}
+			covered[im.OSM] = len(cands)
 			cands = append(cands, placeResult{OSM: im.OSM, Name: im.Name, NameHi: im.NameHi, Lon: im.Lon, Lat: im.Lat, Covered: true})
 		}
 	}
 	for _, p := range places {
-		if !covered[p.OSM] {
-			name := p.Name
-			cands = append(cands, placeResult{OSM: p.OSM, Name: &name, NameHi: p.NameHi, Lon: p.Lon, Lat: p.Lat})
+		if i, ok := covered[p.OSM]; ok { // impacts rows carry no district: take it from the index
+			cands[i].District, cands[i].State = p.District, p.State
+			continue
 		}
+		name := p.Name
+		cands = append(cands, placeResult{OSM: p.OSM, Name: &name, NameHi: p.NameHi, Lon: p.Lon, Lat: p.Lat,
+			District: p.District, State: p.State})
 	}
 	// Rank: name prefix before substring; covered places first within each.
 	var buckets [4][]placeResult
@@ -120,6 +129,9 @@ type threatsResponse struct {
 	Nearby []threat `json:"nearby"`
 	Lon    *float64 `json:"lon"`
 	Lat    *float64 `json:"lat"`
+	// District and State come from the region-wide places index; null where it has none.
+	District *string `json:"district"`
+	State    *string `json:"state"`
 }
 
 // placeThreats answers "is my village in a flood path, from which lake, and
@@ -158,18 +170,16 @@ func (s *server) placeThreats(w http.ResponseWriter, r *http.Request) {
 			break // one row per lake (the nearest, as the file is nearest-first)
 		}
 	}
-	if !resp.Known { // not analysed for any lake: still say where it is, from the region index
-		places, err := s.catalog.Places(r.Context())
-		if err != nil {
-			s.fail(w, r, err, "")
-			return
-		}
-		for _, p := range places {
-			if p.OSM == osm {
-				name, lon, lat := p.Name, p.Lon, p.Lat
-				resp.Name, resp.NameHi, resp.Lon, resp.Lat = &name, p.NameHi, &lon, &lat
-				break
-			}
+	place, err := s.catalog.Place(r.Context(), osm)
+	if err != nil {
+		s.fail(w, r, err, "")
+		return
+	}
+	if place != nil {
+		resp.District, resp.State = place.District, place.State
+		if !resp.Known { // not analysed for any lake: still say where it is, from the region index
+			name, lon, lat := place.Name, place.Lon, place.Lat
+			resp.Name, resp.NameHi, resp.Lon, resp.Lat = &name, place.NameHi, &lon, &lat
 		}
 	}
 	sortThreats(resp.Threats)
