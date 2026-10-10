@@ -37,6 +37,8 @@ export function setSelection(next: MapSelection | null): void {
   listeners.forEach((f) => f());
 }
 
+export const currentSelection = (): MapSelection | null => current;
+
 export function useSelection(): MapSelection | null {
   const [sel, setSel] = useState(current);
   useEffect(() => {

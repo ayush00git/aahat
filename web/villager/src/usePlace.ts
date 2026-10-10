@@ -36,7 +36,8 @@ export function usePlace(osm: string): PlaceState {
             ? s
             : {
                 kind: 'error',
-                notFound: err instanceof ApiError && err.status >= 400 && err.status < 500,
+                // "No such place" (or a malformed id); other 4xx (e.g. 429) can be retried.
+                notFound: err instanceof ApiError && (err.status === 404 || err.status === 400),
                 retry: () => setAttempt((n) => n + 1),
               },
         );

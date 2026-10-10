@@ -17,7 +17,7 @@ import (
 const (
 	MaxQuestionChars = 500
 	defaultTimeout   = 40 * time.Second
-	defaultMaxTokens = 500
+	defaultMaxTokens = 1000 // Devanagari costs several tokens a word: 500 cut Hindi answers mid-sentence
 	defaultMaxRounds = 6
 	audioTimeout     = 8 * time.Second
 )

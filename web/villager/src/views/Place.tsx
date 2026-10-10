@@ -12,8 +12,8 @@ import { Actions, EmergencyNumbers } from './Actions';
 import { MySubscriptions } from './MySubscriptions';
 import { ShareButton } from './Share';
 import { Ask } from './Ask';
-import { setSelection, useLakes } from '../mapStore';
-import { IconBack, IconBell, IconCheck, IconFlood, IconUnknown, IconWarn } from './icons';
+import { currentSelection, setSelection, useLakes } from '../mapStore';
+import { IconBack, IconBell, IconCheck, IconFlood, IconSearch, IconUnknown, IconWarn } from './icons';
 
 /** Names for the heading: the API's, else the ones search gave (uncovered places). */
 function names(data: Threats) {
@@ -27,6 +27,7 @@ export function PlaceView({ osm }: { osm: string }) {
 
   if (state.kind !== 'ok') return <PlaceStatus state={state} />;
   const { data, savedAt } = state;
+  if (isMissingPlace(data)) return <PlaceNotFound />;
   const named = names(data);
   const name = placeName(named, lang);
   const alt = altName(named, lang);
@@ -35,6 +36,10 @@ export function PlaceView({ osm }: { osm: string }) {
   const nearby = data.nearby ?? [];
   const danger = data.threats.length > 0;
   const red = data.threats.some((th) => th.status === 'in_flood_path');
+  // Outside every mapped flood path, but a flood passes close by: a caution,
+  // not the green "all clear" (which is kept for places with neither).
+  const nearbyOnly = data.known && !danger && nearby.length > 0;
+  const clear = data.known && data.safe && !danger && !nearbyOnly;
   const shareText = shareMessage(data, name, t, lang);
 
   return (
@@ -54,7 +59,13 @@ export function PlaceView({ osm }: { osm: string }) {
             <span>{t.dangerTitle(data.threats.length)}</span>
           </h2>
         )}
-        {data.known && data.safe && !danger && (
+        {nearbyOnly && (
+          <h2 class="verdict verdict-amber" aria-live="polite">
+            <IconWarn size={20} />
+            <span>{t.nearbyVerdict}</span>
+          </h2>
+        )}
+        {clear && (
           <h2 class="verdict verdict-green" aria-live="polite">
             <IconCheck size={20} />
             <span>{t.safeTitle}</span>
@@ -77,7 +88,7 @@ export function PlaceView({ osm }: { osm: string }) {
 
         {!data.known && <NotCovered data={named} />}
 
-        {data.known && data.safe && !danger && <p class="caveat">{t.safeCaveat}</p>}
+        {(clear || nearbyOnly) && <p class="caveat">{t.safeCaveat}</p>}
 
         {danger && (
           <section class="stack" aria-labelledby="danger-h">
@@ -129,16 +140,61 @@ export function PlaceOnMap({ data, label }: { data: Threats; label: string }) {
   const here = useHere(data);
   const ids = (data.threats.length > 0 ? data.threats : (data.nearby ?? [])).map((th) => th.lake_id).join(',');
   useEffect(() => {
-    if (here === undefined) return; // still looking the position up
+    if (here === undefined) {
+      // Still looking the position up: don't leave another place's pin and
+      // flood paths on the map meanwhile.
+      if (currentSelection()?.osm !== data.osm) setSelection(null);
+      return;
+    }
+    const floodLakes = ids ? ids.split(',') : [];
+    // No position and nothing to draw: the map goes back to all the lakes.
+    if (here === null && floodLakes.length === 0) return setSelection(null);
     setSelection({
       osm: data.osm,
       label,
       lonlat: here,
-      floodLakes: ids ? ids.split(',') : [],
+      floodLakes,
       threatening: data.threats.length > 0,
     });
   }, [data.osm, label, here?.[0], here?.[1], ids, data.threats.length > 0]);
   return null;
+}
+
+/**
+ * True when the API knows nothing at all about the id (a mistyped or stale
+ * link): not covered, no name, no position, and no search result to name it.
+ * A real village that no lake covers still has a name or a position.
+ */
+export function isMissingPlace(data: Threats): boolean {
+  if (data.known || data.name || data.name_hi) return false;
+  if (typeof data.lon === 'number' && typeof data.lat === 'number') return false;
+  if (data.threats.length > 0 || (data.nearby ?? []).length > 0) return false;
+  return rememberedNames(data.osm) === null;
+}
+
+/** "Place not found", with the way back to search. Clears the map selection. */
+export function PlaceNotFound() {
+  const { t } = useI18n();
+  useEffect(() => setSelection(null), []);
+  return (
+    <>
+      <div class="pane pane-top">
+        <BackLink />
+        <div class="notfound" role="alert">
+          <h1 class="verdict verdict-grey">
+            <IconUnknown size={20} />
+            <span>{t.notFoundTitle}</span>
+          </h1>
+          <p class="caveat">{t.notFoundBody}</p>
+          <a class="btn btn-primary" href={href.home()}>
+            <IconSearch size={18} />
+            {t.notFoundSearch}
+          </a>
+        </div>
+      </div>
+      <div class="pane pane-rest" />
+    </>
+  );
 }
 
 /**
@@ -284,6 +340,8 @@ export function BackLink({ to }: { to?: string }) {
 
 export function PlaceStatus({ state }: { state: Exclude<PlaceState, { kind: 'ok' }> }) {
   const { t } = useI18n();
+  // The API answered "no such place" (4xx): the same screen as an unknown id.
+  if (state.kind === 'error' && state.notFound) return <PlaceNotFound />;
   return (
     <>
       <div class="pane pane-top">
@@ -296,12 +354,10 @@ export function PlaceStatus({ state }: { state: Exclude<PlaceState, { kind: 'ok'
           </div>
         ) : (
           <div class="note stack-sm" role="alert">
-            <p>{state.notFound ? t.unknownTitle : t.loadError}</p>
-            {!state.notFound && (
-              <button type="button" class="btn btn-secondary" onClick={state.retry}>
-                {t.retry}
-              </button>
-            )}
+            <p>{t.loadError}</p>
+            <button type="button" class="btn btn-secondary" onClick={state.retry}>
+              {t.retry}
+            </button>
           </div>
         )}
       </div>

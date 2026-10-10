@@ -7,7 +7,7 @@ import { href } from '../router';
 import { addSubscription, type SavedSubscription } from '../storage';
 import { PushDeniedError, pushSupported, subscribePush } from '../push';
 import { usePlace } from '../usePlace';
-import { BackLink, PlaceOnMap, PlaceStatus } from './Place';
+import { BackLink, PlaceNotFound, PlaceOnMap, PlaceStatus, isMissingPlace } from './Place';
 import { SubRow } from './MySubscriptions';
 import { IconBell, IconCheck, IconPhone, IconSms } from './icons';
 
@@ -28,6 +28,7 @@ export function normalizePhone(input: string): string | null {
 export function Subscribe({ osm }: { osm: string }) {
   const state = usePlace(osm);
   if (state.kind !== 'ok') return <PlaceStatus state={state} />;
+  if (isMissingPlace(state.data)) return <PlaceNotFound />;
   return <SubscribeForm osm={osm} place={state.data} />;
 }
 

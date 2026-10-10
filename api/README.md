@@ -87,7 +87,7 @@ down, as the alerts round minutes; a number is never accepted rounded up). With 
 is sent no Hindi (prompt, advice and tool results without the `_hi` fields) and an answer containing
 Devanagari fails the check. A failed check gets one corrective retry; a second failure, a timeout or
 more than 6 tool rounds gives a fixed template built from the data (`"mode": "template"`). Limits:
-question <= 500 characters, 500 output tokens, 40 s for the model, 10 questions per client IP per
+question <= 500 characters, 1000 output tokens, 40 s for the model, 10 questions per client IP per
 minute (`AAHAT_ASK_PER_MIN`). With Polly on, the answer is also spoken (`audio_url`).
 
 | Variable | Meaning |

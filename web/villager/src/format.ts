@@ -16,17 +16,22 @@ export function num(n: number, lang: Lang, digits = 1): string {
   return n.toLocaleString(locale(lang), { maximumFractionDigits: digits });
 }
 
+/**
+ * Clock options for the language. hi-IN would otherwise print a Latin
+ * "am/pm" inside a Hindi sentence, so Hindi uses the spoken day period
+ * ("दोपहर 1:05"); browsers that don't know the option fall back to am/pm.
+ */
+const clock = (lang: Lang): Intl.DateTimeFormatOptions =>
+  lang === 'hi'
+    ? { hour: 'numeric', minute: '2-digit', hour12: true, dayPeriod: 'short' }
+    : { hour: 'numeric', minute: '2-digit', hour12: true };
+
 export function dateTime(ms: number, lang: Lang): string {
-  return new Date(ms).toLocaleString(locale(lang), {
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return new Date(ms).toLocaleString(locale(lang), { day: 'numeric', month: 'short', ...clock(lang) });
 }
 
 export function time(ms: number, lang: Lang): string {
-  return new Date(ms).toLocaleTimeString(locale(lang), { hour: 'numeric', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString(locale(lang), clock(lang));
 }
 
 type Named = Pick<Place, 'name' | 'name_hi'> & { osm?: string };

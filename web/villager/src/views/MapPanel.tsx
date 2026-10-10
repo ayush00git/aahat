@@ -11,6 +11,11 @@ import { IconMap } from './icons';
 
 type Status = 'held' | 'loading' | 'ready' | 'error';
 
+/** Flood paths drawn at once: every lake that threatens the place (up to 6)… */
+const MAX_THREAT_PATHS = 6;
+/** …but only the first few of the floods that merely pass nearby. */
+const MAX_NEARBY_PATHS = 3;
+
 const LEVELS: RiskLevel[] = ['low', 'moderate', 'high', 'very_high'];
 
 /** True on a data-saver or 2G connection: the map then waits for a tap. */
@@ -75,8 +80,14 @@ export function MapPanel() {
       handle.current = null;
       made?.destroy();
     };
-    // The language only changes the two-finger hint, so the map is not rebuilt for it.
+    // The language only changes the two-finger hint, which is updated in
+    // place below, so the map is not rebuilt for it.
   }, [wanted, attempt]);
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    handle.current?.setGestureHelp(t.mapTwoFingers);
+  }, [status, lang]);
 
   // Back online after a failed load: try once more.
   useEffect(() => {
@@ -108,7 +119,7 @@ export function MapPanel() {
 
   const view = useMemo<MapView>(() => {
     if (!sel) return { place: null, keyLakes: [], fitLakes: [], floodLakes: [] };
-    const floodLakes = sel.floodLakes.slice(0, 3);
+    const floodLakes = sel.floodLakes.slice(0, sel.threatening ? MAX_THREAT_PATHS : MAX_NEARBY_PATHS);
     const near = sel.lonlat && Array.isArray(lakes) ? nearestLakes(lakes, sel.lonlat, 3).map((l) => l.id) : [];
     const keyLakes = floodLakes.length > 0 ? floodLakes : near;
     return {

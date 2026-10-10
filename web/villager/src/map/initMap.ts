@@ -69,6 +69,8 @@ export interface MapHandle {
   setLakes(lakes: MapLake[], labels: MapLabels): void;
   setView(view: MapView): void;
   setBasemap(b: Basemap): void;
+  /** The language changed: the two-finger hint follows it. */
+  setGestureHelp(text: string): void;
   /** The theme changed: re-read the colours that come from CSS. */
   setTheme(): void;
   destroy(): void;
@@ -170,7 +172,7 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
     });
   } catch {
     opts.onError(); // no WebGL
-    return { setLakes() {}, setView() {}, setBasemap() {}, setTheme() {}, destroy() {} };
+    return { setLakes() {}, setView() {}, setBasemap() {}, setGestureHelp() {}, setTheme() {}, destroy() {} };
   }
   map.touchZoomRotate.disableRotation();
   map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -185,7 +187,13 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
   let popup: Popup | null = null;
   let placeMarker: Marker | null = null;
   const lakeMarkers = new Map<string, Marker>();
-  const drawn = new Set<string>(); // lake ids with flood layers on the map
+  const drawn = new Set<string>(); // lake ids with flood layers on the map (or on their way)
+  // Flood layers are fetched for a few lakes at a time, in the view's order,
+  // so a place below several lakes doesn't open a dozen downloads at once on
+  // a slow phone.
+  const FLOOD_CONCURRENCY = 2;
+  const floodQueue: string[] = [];
+  let floodActive = 0;
 
   map.on('error', (e) => {
     // Tile errors are not fatal (offline, slow network); only note a broken style.
@@ -329,10 +337,32 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
       if (map.getSource(key)) map.removeSource(key);
     }
     drawn.delete(id);
+    const queued = floodQueue.indexOf(id);
+    if (queued >= 0) floodQueue.splice(queued, 1);
   }
 
-  async function drawFlood(id: string, seq: number) {
-    const stale = () => dead || seq !== viewSeq;
+  function queueFlood(id: string) {
+    drawn.add(id);
+    floodQueue.push(id);
+    pumpFlood();
+  }
+
+  function pumpFlood() {
+    while (!dead && floodActive < FLOOD_CONCURRENCY && floodQueue.length > 0) {
+      const id = floodQueue.shift()!;
+      floodActive++;
+      void drawFlood(id).finally(() => {
+        floodActive--;
+        pumpFlood();
+      });
+    }
+  }
+
+  async function drawFlood(id: string) {
+    // Stale once the lake has left the view (not merely when the view was set
+    // again with the same lakes, e.g. after a language change).
+    const stale = () => dead || !drawn.has(id);
+    if (stale()) return;
     const add = (part: string, data: FC, layer: Record<string, unknown>, before?: string) => {
       const key = `${id}-${part}`;
       if (stale() || map.getSource(key)) return;
@@ -342,7 +372,6 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
         before && map.getLayer(before) ? before : undefined,
       );
     };
-    drawn.add(id);
     // The line and the expected corridor first; the wider severe corridor after.
     const [path, expected] = await Promise.all([getJSON(id, 'flood_path'), getJSON(id, 'corridor_expected')]);
     if (path) {
@@ -363,6 +392,7 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
         `${id}-path`,
       );
     }
+    if (stale()) return;
     const severe = await getJSON(id, 'corridor_severe');
     if (severe) {
       add(
@@ -394,13 +424,19 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
         drawPlace();
         markKeyLakes();
         for (const id of [...drawn]) if (!next.floodLakes.includes(id)) removeFlood(id);
-        for (const id of next.floodLakes) if (!drawn.has(id)) void drawFlood(id, seq);
+        for (const id of next.floodLakes) if (!drawn.has(id)) queueFlood(id);
         fit();
       });
     },
     setBasemap(b) {
       basemap = b;
       loaded.then(() => !dead && applyBasemap());
+    },
+    setGestureHelp(text) {
+      // MapLibre reads its locale once, when the hint is built; the hint is a
+      // plain text node, so it is updated in place.
+      const hint = container.querySelector('.maplibregl-cooperative-gesture-screen .maplibregl-mobile-message');
+      if (hint) hint.textContent = text;
     },
     setTheme() {
       COLORS = colors();

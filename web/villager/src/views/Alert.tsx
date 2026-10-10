@@ -106,8 +106,11 @@ export function Alert({ params }: { params: URLSearchParams }) {
         <div class="alert-count" aria-live="assertive">
           <p class="alert-count-label">{t.alertArrival}</p>
           <p class="alert-count-num">
-            <span class="arrival-tilde">~</span>
-            {num(wholeMinutes(minutes), lang, 0)} <span class="alert-count-unit">{t.minutes}</span>
+            <span class="alert-count-value">
+              <span class="arrival-tilde">~</span>
+              {num(wholeMinutes(minutes), lang, 0)}
+            </span>{' '}
+            <span class="alert-count-unit">{t.minutes}</span>
           </p>
         </div>
       )}

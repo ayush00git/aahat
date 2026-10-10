@@ -123,33 +123,65 @@ export function Ask({ osm }: { osm?: string }) {
   );
 }
 
+type AudioState = 'idle' | 'loading' | 'playing' | 'error';
+
+/**
+ * The spoken answer. The file is only fetched on the first tap (preload
+ * none), so between the tap and the first sound the button says "loading";
+ * it says "pause" only once sound is actually coming out.
+ */
 function AnswerAudio({ src }: { src: string | null }) {
   const { t } = useI18n();
   const audio = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) return null;
+  const [state, setState] = useState<AudioState>('idle');
+  if (!src) return null;
   const toggle = () => {
     const a = audio.current;
     if (!a) return;
-    if (a.paused) a.play().catch(() => setFailed(true));
-    else a.pause();
+    if (!a.paused) return a.pause();
+    if (state === 'error') a.load(); // try the download again
+    setState('loading');
+    a.play().catch((err: unknown) => {
+      // Paused while still loading: not a failure.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setState('error');
+    });
   };
+  const loading = state === 'loading';
+  const playing = state === 'playing';
   return (
-    <div>
+    <div class="ask-audio">
       <audio
         ref={audio}
         src={src}
         preload="none"
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
-        onError={() => setFailed(true)}
+        onPlaying={() => setState('playing')}
+        onWaiting={() => setState((s) => (s === 'error' ? s : 'loading'))}
+        onPause={() => setState((s) => (s === 'error' ? s : 'idle'))}
+        onEnded={() => setState('idle')}
+        onError={() => setState('error')}
       />
-      <button type="button" class="btn btn-secondary ask-play" onClick={toggle} aria-pressed={playing}>
-        {playing ? <IconPause size={16} /> : <IconPlay size={16} />}
-        {playing ? t.alertPause : t.askListen}
+      <button
+        type="button"
+        class="btn btn-secondary ask-play"
+        onClick={toggle}
+        aria-pressed={playing}
+        aria-busy={loading}
+      >
+        {loading ? (
+          <span class="ask-spinner" aria-hidden="true" />
+        ) : playing ? (
+          <IconPause size={16} />
+        ) : (
+          <IconPlay size={16} />
+        )}
+        {loading ? t.askAudioLoading : playing ? t.alertPause : t.askListen}
       </button>
+      {state === 'error' && (
+        <p class="ask-error" role="status">
+          {t.askAudioError}
+        </p>
+      )}
     </div>
   );
 }

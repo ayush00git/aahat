@@ -21,14 +21,14 @@ const hi = {
   homeLabel: 'आहट — मुख्य पन्ना',
 
   searchLabel: 'अपना गाँव खोजें',
-  searchPlaceholder: 'गाँव का नाम, जैसे Sissu',
+  searchPlaceholder: 'गाँव का नाम, जैसे Bhiyari',
   searchHint: 'नाम अंग्रेज़ी अक्षरों में लिखने पर ज़्यादा गाँव मिलेंगे।',
   searching: 'खोज रहे हैं…',
   noResults: 'कोई गाँव नहीं मिला। नाम अंग्रेज़ी अक्षरों में लिखकर देखें।',
   coveredBadge: 'निगरानी में',
   coveredHelp: 'निगरानी वाली झील के बाढ़ मार्ग का विश्लेषण इस गाँव तक पहुँचता है',
   searchError: 'खोज नहीं हो सकी। इंटरनेट जाँचें और फिर कोशिश करें।',
-  districtLine: (d: string) => `ज़िला ${d}`,
+  districtLine: (d: string) => `${d} ज़िला`,
   weatherHigh: 'अगले 3 दिन भारी बारिश का अनुमान — सतर्क रहें',
   weatherElevated: 'अगले 3 दिन बारिश या गर्मी बढ़ने का अनुमान',
   weatherNormal: 'अगले 3 दिन मौसम सामान्य',
@@ -48,8 +48,10 @@ const hi = {
   safeTitle: 'आपका गाँव किसी जोखिम वाले बाढ़ मार्ग में नहीं है',
   safeCaveat:
     'यह जानकारी केवल उन हिमनद झीलों के लिए है जिनकी हम निगरानी करते हैं, और गाँव के एक बिंदु पर आधारित है — नदी किनारे के घर, खेत और सड़कें फिर भी डूब सकते हैं। भारी बारिश, बादल फटने या दूसरी नदियों से बाढ़ फिर भी आ सकती है — ज़िला प्रशासन की चेतावनी हमेशा मानें।',
-  unknownTitle: 'इस गाँव की जानकारी उपलब्ध नहीं',
-  unknownBody: 'यह गाँव हमारी निगरानी वाली किसी झील के विश्लेषण में शामिल नहीं है।',
+  nearbyVerdict: 'आपका गाँव बाढ़ के रास्ते से बाहर है, पर बाढ़ पास से गुज़रेगी — नदी से दूर रहें',
+  notFoundTitle: 'यह जगह नहीं मिली',
+  notFoundBody: 'यह लिंक पुराना या गलत हो सकता है। अपने गाँव का नाम खोजकर देखें।',
+  notFoundSearch: 'गाँव खोजें',
   notCoveredTitle: 'यह गाँव हमारी निगरानी वाली किसी झील के बाढ़ मार्ग के नीचे नहीं है',
   notCoveredBody:
     'हम अभी चुनी हुई हिमनद झीलों पर उपग्रह से नज़र रखते हैं। निगरानी का दायरा बढ़ाया जा रहा है। भारी बारिश, बादल फटने या दूसरी नदियों से बाढ़ फिर भी आ सकती है — ज़िला प्रशासन की चेतावनी हमेशा मानें।',
@@ -63,7 +65,7 @@ const hi = {
   straightNote: 'दूरी सीधी रेखा में (सीधी दूरी) है, नदी के रास्ते की नहीं।',
   lakesError: 'झीलों की सूची नहीं मिल सकी।',
   lakeRisk: (level: string) => `जोखिम: ${level}`,
-  dangerTitle: (n: number) => (n === 1 ? 'इस झील से बाढ़ का ख़तरा' : `इन ${n} झीलों से बाढ़ का ख़तरा`),
+  dangerTitle: (n: number) => (n === 1 ? 'इस झील से बाढ़ का खतरा' : `इन ${n} झीलों से बाढ़ का खतरा`),
 
   badge_in_flood_path: 'बाढ़ मार्ग में',
   badge_at_risk: 'जोखिम में',
@@ -138,7 +140,7 @@ const hi = {
   submit: 'जुड़ें',
   submitting: 'भेज रहे हैं…',
   success: 'आप जुड़ गए हैं',
-  successBody: (place: string) => `बाढ़ का ख़तरा होने पर ${place} के लिए चेतावनी भेजी जाएगी।`,
+  successBody: (place: string) => `बाढ़ का खतरा होने पर ${place} के लिए चेतावनी भेजी जाएगी।`,
   subId: 'पंजीकरण संख्या',
   unsubscribe: 'चेतावनी बंद करें',
   unsubscribing: 'बंद कर रहे हैं…',
@@ -180,6 +182,8 @@ const hi = {
   askRateLimit: 'थोड़ी देर बाद पूछें।',
   askUnavailable: 'सहायक अभी उपलब्ध नहीं है।',
   askListen: 'उत्तर सुनें',
+  askAudioLoading: 'आवाज़ लोड हो रही है…',
+  askAudioError: 'आवाज़ नहीं चल सकी। फिर कोशिश करें।',
   askNote: 'उत्तर Aahat के आँकड़ों से; AI द्वारा लिखा गया',
   officialsLabel: 'अधिकारियों का डैशबोर्ड',
 
@@ -209,7 +213,7 @@ const en: Strings = {
   homeLabel: 'Aahat home',
 
   searchLabel: 'Find your village',
-  searchPlaceholder: 'Village name, e.g. Sissu',
+  searchPlaceholder: 'Village name, e.g. Bhiyari',
   searchHint: 'Type the name in English letters.',
   searching: 'Searching…',
   noResults: 'No village found. Try spelling the name in English letters.',
@@ -236,8 +240,10 @@ const en: Strings = {
   safeTitle: 'Your village is not in any risky flood path',
   safeCaveat:
     'This covers only the glacial lakes we monitor and is judged at one point for the village — houses, fields and roads by the river can still flood. Floods from heavy rain, cloudbursts or other rivers can still happen — always follow district administration warnings.',
-  unknownTitle: 'No information for this village',
-  unknownBody: 'This village is not covered by the analysis of any lake we monitor.',
+  nearbyVerdict: 'Your village is outside the mapped flood path, but a flood would pass close by — stay away from the river',
+  notFoundTitle: 'Place not found',
+  notFoundBody: 'This link may be old or wrong. Search for your village by name.',
+  notFoundSearch: 'Search for a village',
   notCoveredTitle: 'This village is not below the flood path of any lake we monitor',
   notCoveredBody:
     'We currently watch selected glacial lakes by satellite, and coverage is expanding. Floods from heavy rain, cloudbursts or other rivers can still happen — always follow district administration warnings.',
@@ -365,6 +371,8 @@ const en: Strings = {
   askRateLimit: 'Try again in a minute.',
   askUnavailable: 'The assistant is not available right now.',
   askListen: 'Listen to the answer',
+  askAudioLoading: 'Loading audio…',
+  askAudioError: 'The audio could not be played. Try again.',
   askNote: "Answer written by AI from Aahat's data",
   officialsLabel: "Officials' dashboard",
 
