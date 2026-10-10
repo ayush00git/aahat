@@ -87,8 +87,11 @@ curl "$API/places/search?q=sissu"
 curl $API/places/node/342116474/threats
 ```
 
-About 19,800 settlements in and around Himachal Pradesh are searchable. A place outside every mapped
-flood path is reported as not covered, which is not the same as safe.
+About 19,800 settlements in and around Himachal Pradesh are searchable. Spelling variants match
+(`Sisu` finds Sissu, `Kyelang` finds Keylong) and so does a name typed in Devanagari (`सिस्सू`), even for
+places with no Hindi name on record. Results: exact name first, then names starting with the query,
+then names containing it; covered places first, then larger places; at most 20. A place outside every
+mapped flood path is reported as not covered, which is not the same as safe.
 
 ## Ask (assistant)
 
@@ -108,18 +111,21 @@ curl -X POST $API/ask -H 'content-type: application/json' \
 Response: `{"answer", "lang", "sources": [{"tool", "args"}], "audio_url", "mode"}`.
 
 - The answer is written by Claude, which reads this API through tools. Every number in the answer is
-  checked against what the tools returned; if the check fails twice the answer is a fixed template
-  built from the data (`"mode": "template"`).
+  checked against what the tools returned, and an English answer must contain no Hindi text; if a
+  check fails twice the answer is a fixed template built from the data (`"mode": "template"`).
+- With `place_osm` the village's threats are looked up before the model is called, so `sources` starts
+  with that `place_threats` lookup. The assistant can say how deep the flood would be in the river
+  beside the village and how far the village ground is above or below the flood level.
 - `sources` lists the lookups behind the answer. `audio_url` is a spoken version, relative to the
   base URL, when voice is enabled.
-- Off-topic questions are declined. Answers take roughly 7 to 15 seconds.
+- Off-topic questions are declined. Answers take typically 7 to 20 seconds (the server gives up on the model after 40).
 - Limit: 10 questions per client per minute (HTTP 429 beyond that). HTTP 503 means no model is configured.
 
 ## Alerts
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `POST /subscriptions` | public | Subscribe a phone or browser to a place's alerts |
+| `POST /subscriptions` | public | Subscribe a phone or browser to a place's alerts. `place_osm` must be a place from `/places/search` (404 otherwise) |
 | `DELETE /subscriptions/{id}` | public | Unsubscribe |
 | `GET /push/public-key` | public | VAPID key for web push |
 | `GET /audio/{name}` | public | A spoken warning (MP3) |

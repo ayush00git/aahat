@@ -13,7 +13,7 @@ func TestPlacesSearch(t *testing.T) {
 		q    string
 		want []string // names, in order
 	}{
-		{"bhi", []string{"Bhiyari", "Bhiyara"}},             // in both lakes: listed once
+		{"bhi", []string{"Bhiyari", "Bhiyara"}},  // in both lakes: listed once
 		{"YAM", []string{"Yamling"}},             // case-insensitive; outside places are searchable
 		{"उदय", []string{"Udaipur"}},             // Hindi name
 		{"pur", []string{"Udaipur", "Hamirpur"}}, // substring; covered Udaipur first, then region-wide Hamirpur; the school "..., Udaipur" is not a settlement
@@ -124,5 +124,66 @@ func TestThreatsForUncoveredPlaceNameItButStayUnknown(t *testing.T) {
 	got := decode[threatsResponse](t, env.do(t, "GET", "/places/node/1522750710/threats", nil))
 	if got.Known || !got.Safe || got.Name == nil || *got.Name != "Hamirpur" || got.Lat == nil || len(got.Threats) != 0 {
 		t.Fatalf("got %+v", got)
+	}
+}
+
+// searchIndex stands in for the region index in the spelling tests.
+const searchIndex = `{"places": [
+	{"osm": "node/1", "name": "Sisul", "name_hi": null, "place": "hamlet", "lon": 75.7, "lat": 33.1},
+	{"osm": "node/2", "name": "Sisu Ser", "name_hi": null, "place": "hamlet", "lon": 77.6, "lat": 31.4},
+	{"osm": "node/3", "name": "Sissu", "name_hi": null, "place": "village", "lon": 77.1, "lat": 32.4},
+	{"osm": "node/4", "name": "Manali", "name_hi": null, "place": "hamlet", "lon": 77.3, "lat": 31.6},
+	{"osm": "node/5", "name": "Manali", "name_hi": "मनाली", "place": "town", "lon": 77.1, "lat": 32.2},
+	{"osm": "node/6", "name": "Kalang", "name_hi": null, "place": "hamlet", "lon": 77.2, "lat": 32.1},
+	{"osm": "node/7", "name": "Keylong", "name_hi": "केलांग", "place": "town", "lon": 77.0, "lat": 32.5},
+	{"osm": "node/8", "name": "Koksar", "name_hi": null, "place": "hamlet", "lon": 77.2, "lat": 32.4},
+	{"osm": "node/9", "name": "Old Manali", "name_hi": null, "place": "village", "lon": 77.1, "lat": 32.2},
+	{"osm": "node/10", "name": "Wangtu", "name_hi": null, "place": "village", "lon": 78.0, "lat": 31.5}
+]}`
+
+func TestPlacesSearchSpellings(t *testing.T) {
+	env := newEnv(t, func(key string, b []byte) []byte {
+		if key == "places/index.json" {
+			return []byte(searchIndex)
+		}
+		return b
+	})
+	tests := []struct {
+		q    string
+		want []string // osm numbers, in order
+	}{
+		{"Sissu", []string{"3", "1", "2"}},   // exact first, then the names that start with it
+		{"Sisu", []string{"3", "1", "2"}},    // a doubled letter counts once
+		{"sisu ser", []string{"2"}},          // spaces and case do not matter
+		{"सिस्सू", []string{"3"}},            // no Hindi name in the index: matched through its sound
+		{"manali", []string{"5", "4", "9"}},  // exact: town before hamlet; then the name that contains it
+		{"Manaali", []string{"5", "4", "9"}}, // aa = a
+		{"मनाली", []string{"5", "4"}},        // the Hindi name, and the hamlet that has none
+		{"Keylong", []string{"7"}},
+		{"Kyelang", []string{"7", "6"}}, // vowels differ: found by consonants, town first
+		{"केलांग", []string{"7"}},
+		{"Khoksar", []string{"8"}}, // kh = k when nothing else matches
+		{"कोकसर", []string{"8"}},   // Hindi drops the inherent vowel
+		{"vangtu", []string{"10"}}, // w = v
+		{"qwxzkj", nil},
+		{"zzz", nil},
+		{"ज्ञ", nil},
+		{"k", []string{"7", "6", "8"}}, // one character: prefix matches, as before
+	}
+	for _, tc := range tests {
+		t.Run(tc.q, func(t *testing.T) {
+			r := env.do(t, "GET", "/places/search?q="+url.QueryEscape(tc.q), nil)
+			expectStatus(t, r, 200)
+			var got []string
+			for _, p := range decode[[]placeResult](t, r) {
+				if !strings.HasPrefix(p.OSM, "node/") || p.Covered {
+					continue // the lakes' own settlements (fixture names) are not under test here
+				}
+				got = append(got, strings.TrimPrefix(p.OSM, "node/"))
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

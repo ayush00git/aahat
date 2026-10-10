@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"cmp"
 	"net/http"
 	"slices"
 	"strings"
@@ -25,10 +26,15 @@ type placeResult struct {
 }
 
 // searchPlaces finds settlements by English or Hindi name across every lake's
-// impacts, including ones outside any flood path (so a villager can learn
-// that they are safe). Prefix matches come first.
+// impacts and the region-wide index, including ones outside any flood path (so a
+// villager can learn that they are safe). Names are compared by their search keys
+// (data.LatinKey and friends), so "Sisu" and "सिस्सू" find Sissu.
+//
+// Order: exact name, then names that start with the query, then names that contain
+// it; within each, places covered by a lake's analysis first, then larger places
+// (town, village, hamlet), then the order of the files.
 func (s *server) searchPlaces(w http.ResponseWriter, r *http.Request) {
-	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q == "" {
 		writeError(w, http.StatusBadRequest, "q is required")
 		return
@@ -43,52 +49,82 @@ func (s *server) searchPlaces(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "")
 		return
 	}
-	// Candidates: the analysed settlements (covered), then every other named place in the region.
-	var cands []placeResult
-	covered := map[string]int{} // osm -> index in cands
+	// The analysed settlements, by OSM id. An impacts row has no district or place kind;
+	// those come from the index when it lists the place too.
+	covered := map[string]*data.Impact{}
+	var coveredOrder []string
 	for _, li := range all {
-		for _, im := range li.Impacts {
+		for i := range li.Impacts {
+			im := &li.Impacts[i]
 			if im.Kind != data.KindSettlement {
 				continue
 			}
-			if _, seen := covered[im.OSM]; seen {
+			if _, seen := covered[im.OSM]; !seen {
+				covered[im.OSM] = im
+				coveredOrder = append(coveredOrder, im.OSM)
+			}
+		}
+	}
+	inIndex := make(map[string]*data.Place, len(covered))
+	for i := range places {
+		if _, ok := covered[places[i].OSM]; ok {
+			inIndex[places[i].OSM] = &places[i]
+		}
+	}
+
+	type hit struct {
+		res  placeResult
+		tier int
+		size int
+	}
+	query := data.NewSearchQuery(q)
+	var hits []hit
+	// A looser pass (see data.NewSearchQuery) runs only when the stricter ones found nothing.
+	for pass := 0; pass < query.Passes() && len(hits) == 0; pass++ {
+		for _, osm := range coveredOrder {
+			im := covered[osm]
+			tier := query.Match(pass, data.NewSearchKeys(data.Str(im.Name), data.Str(im.NameHi)))
+			if tier == data.NoMatch {
 				continue
 			}
-			covered[im.OSM] = len(cands)
-			cands = append(cands, placeResult{OSM: im.OSM, Name: im.Name, NameHi: im.NameHi, Lon: im.Lon, Lat: im.Lat, Covered: true})
+			h := hit{tier: tier, size: data.PlaceSize(""), res: placeResult{
+				OSM: im.OSM, Name: im.Name, NameHi: im.NameHi, Lon: im.Lon, Lat: im.Lat, Covered: true}}
+			if p := inIndex[osm]; p != nil {
+				h.res.District, h.res.State, h.size = p.District, p.State, data.PlaceSize(p.Place)
+			}
+			hits = append(hits, h)
+		}
+		for i := range places {
+			p := &places[i]
+			if _, ok := covered[p.OSM]; ok {
+				continue
+			}
+			tier := query.Match(pass, p.Keys)
+			if tier == data.NoMatch {
+				continue
+			}
+			name := p.Name
+			hits = append(hits, hit{tier: tier, size: data.PlaceSize(p.Place), res: placeResult{
+				OSM: p.OSM, Name: &name, NameHi: p.NameHi, Lon: p.Lon, Lat: p.Lat, District: p.District, State: p.State}})
 		}
 	}
-	for _, p := range places {
-		if i, ok := covered[p.OSM]; ok { // impacts rows carry no district: take it from the index
-			cands[i].District, cands[i].State = p.District, p.State
-			continue
+	slices.SortStableFunc(hits, func(a, b hit) int {
+		if c := cmp.Compare(a.tier, b.tier); c != 0 {
+			return c
 		}
-		name := p.Name
-		cands = append(cands, placeResult{OSM: p.OSM, Name: &name, NameHi: p.NameHi, Lon: p.Lon, Lat: p.Lat,
-			District: p.District, State: p.State})
-	}
-	// Rank: name prefix before substring; covered places first within each.
-	var buckets [4][]placeResult
-	for _, c := range cands {
-		name, nameHi := strings.ToLower(data.Str(c.Name)), strings.ToLower(data.Str(c.NameHi))
-		rank := 0
-		switch {
-		case strings.HasPrefix(name, q) || strings.HasPrefix(nameHi, q):
-		case strings.Contains(name, q) || strings.Contains(nameHi, q):
-			rank = 2
-		default:
-			continue
+		if a.res.Covered != b.res.Covered {
+			if a.res.Covered {
+				return -1
+			}
+			return 1
 		}
-		if !c.Covered {
-			rank++
-		}
-		buckets[rank] = append(buckets[rank], c)
+		return cmp.Compare(a.size, b.size)
+	})
+	out := make([]placeResult, 0, min(len(hits), maxSearchResults))
+	for _, h := range hits[:min(len(hits), maxSearchResults)] {
+		out = append(out, h.res)
 	}
-	out := []placeResult{}
-	for _, b := range buckets {
-		out = append(out, b...)
-	}
-	writeJSON(w, http.StatusOK, out[:min(len(out), maxSearchResults)])
+	writeJSON(w, http.StatusOK, out)
 }
 
 type scenarioPair[T any] struct {

@@ -163,6 +163,8 @@ type Place struct {
 	// District and State are absent from older indexes and null where the pipeline found none.
 	District *string `json:"district"`
 	State    *string `json:"state"`
+	// Keys are the name's search keys, computed once when the index is parsed.
+	Keys SearchKeys `json:"-"`
 }
 
 // Places returns every searchable settlement, or an empty list if the index is not published yet.
@@ -185,6 +187,9 @@ func (c *Catalog) Places(ctx context.Context) ([]Place, error) {
 	}
 	if err := json.Unmarshal(b, &doc); err != nil {
 		return nil, fmt.Errorf("places index: %w", err)
+	}
+	for i := range doc.Places {
+		doc.Places[i].Keys = NewSearchKeys(doc.Places[i].Name, Str(doc.Places[i].NameHi))
 	}
 	c.places, c.placesRaw = doc.Places, b
 	return c.places, nil

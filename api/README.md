@@ -32,10 +32,10 @@ Villager app (public)
 
 | Route | Returns |
 | --- | --- |
-| `GET /places/search?q=` | Settlements matching an English or Hindi name, with `covered`, `district` and `state` |
+| `GET /places/search?q=` | Settlements matching an English or Hindi name, with `covered`, `district` and `state`. Spelling variants and Devanagari spellings of places without a Hindi name match too (rules in `internal/data/search.go`) |
 | `GET /places/{osm}/threats` | Which lakes threaten a place and the minutes to arrival; `osm` URL-encoded (`node%2F123`) |
 | `GET /places/{type}/{num}/threats` | The same, with the OSM id as two path segments |
-| `POST /subscriptions` | Subscribe a phone or browser to a place's alerts |
+| `POST /subscriptions` | Subscribe a phone or browser to a place's alerts; 404 unless `place_osm` is in the places index or is a settlement, school or health facility in a lake's impacts |
 | `DELETE /subscriptions/{id}` | Unsubscribe (the id is the token) |
 | `GET /push/public-key` | VAPID public key for web push |
 | `GET /audio/{name}` | A spoken warning (when Polly is enabled) |
@@ -76,12 +76,19 @@ answers a villager's question in 2-5 short sentences:
 
 `internal/assistant` runs Claude (Anthropic API, or the Bedrock Converse API) with five tools: `search_places`,
 `place_threats`, `list_lakes`, `lake_summary`, `what_to_do`. The tools call this API's own routes in
-process, so the model sees what the apps show. The model supplies no numbers: after it answers, every
-number in the text must appear in a tool result of that conversation (or be 112 / 1077, or a returned
-number rounded down, as the alerts round minutes). A failed check gets one corrective retry; a second
-failure, a timeout or more than 6 tool rounds gives a fixed template built from the data
-(`"mode": "template"`). Limits: question <= 500 characters, 500 output tokens, 20 s, 10 questions per
-client IP per minute (`AAHAT_ASK_PER_MIN`). With Polly on, the answer is also spoken (`audio_url`).
+process, so the model sees what the apps show. `place_threats` also carries, per flood scenario, the
+depth of the flood in the river beside the place (`river_water_depth_m`, the API's `flood_depth_m`) and
+where the place's ground lies against the flood level (`village_ground`, `village_ground_m`, from
+`height_above_flood_m`). To save model rounds, the first message already holds the safety advice and,
+when `place_osm` is given, that place's `place_threats` result (listed in `sources`); the model may ask
+for several tools in one turn. The model supplies no numbers: after it answers, every number in the
+text must appear in a tool result of that conversation (or be 112 / 1077, or a returned number rounded
+down, as the alerts round minutes; a number is never accepted rounded up). With `lang: "en"` the model
+is sent no Hindi (prompt, advice and tool results without the `_hi` fields) and an answer containing
+Devanagari fails the check. A failed check gets one corrective retry; a second failure, a timeout or
+more than 6 tool rounds gives a fixed template built from the data (`"mode": "template"`). Limits:
+question <= 500 characters, 500 output tokens, 40 s for the model, 10 questions per client IP per
+minute (`AAHAT_ASK_PER_MIN`). With Polly on, the answer is also spoken (`audio_url`).
 
 | Variable | Meaning |
 | --- | --- |

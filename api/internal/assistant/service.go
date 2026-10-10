@@ -10,12 +10,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 )
 
 const (
 	MaxQuestionChars = 500
-	defaultTimeout   = 20 * time.Second
+	defaultTimeout   = 40 * time.Second
 	defaultMaxTokens = 500
 	defaultMaxRounds = 6
 	audioTimeout     = 8 * time.Second
@@ -35,7 +36,7 @@ type Service struct {
 	Model   string
 	API     http.Handler
 	Speaker Speaker       // optional
-	Timeout time.Duration // for one question, default 20 s
+	Timeout time.Duration // for one question, default 40 s
 	Log     *slog.Logger
 }
 
@@ -67,28 +68,64 @@ type Answer struct {
 	Mode string `json:"mode"`
 }
 
+// systemPrompt takes the language rule, the risk-level words and the high-ground phrase of the
+// answer's language, so an English conversation never sees a Hindi word.
 const systemPrompt = `You are the question-answering voice of Aahat, a service that watches glacial lakes in Himachal Pradesh, India, for the danger of a glacial lake outburst flood (GLOF) and warns the villages downstream. The people asking are villagers, often with little schooling, reading on a basic phone or listening to your answer read aloud. A wrong number could cost lives or cause panic, so the rules about numbers below are absolute.
 
 Language: %s Use short, everyday words a farmer would use. Write 2 to 5 short sentences of plain text: no lists, no headings, no markdown, no emoji.
 
 Facts and numbers:
-- You know nothing about any lake or village yourself. Everything you say about them must come from the tools in this conversation. Call the tools before answering; do not guess.
-- Every number you write must appear in a tool result, copied exactly. Do not calculate, convert units, add, average, or round. The one exception: for minutes until water arrives, say the "minutes_to_say" value (already rounded down, the way our alerts say it).
+- You know nothing about any lake or village yourself. Everything you say about them must come from the data in this conversation: the tool results, and any data already looked up for you in the first message. Do not guess.
+- Every number you write must appear in that data, copied exactly, decimals included (6.2 stays 6.2). Do not calculate, convert units, add, average, or round. The one exception: for minutes until water arrives, say the "minutes_to_say" value (already rounded down, the way our alerts say it).
 - Use few numbers: the ones that answer the question.
 - The emergency phone numbers 112 and 1077 may always be given.
-- Risk levels: low = कम, moderate = मध्यम, high = अधिक, very_high = बहुत अधिक. A risk score is a screening score out of 100, not a chance of bursting.
+- Risk levels: %s. A risk score is a screening score out of 100, not a chance of bursting.
+- How deep the water would be: use if_lake_bursts from place_threats. river_water_depth_m is the depth of the flood water in the river beside the village, measured from the river bed; it is not the depth of water in the village. village_ground and village_ground_m say how far the village ground is below or above the flood level. Say both when asked about depth, and say which flood (expected, or the larger severe one) the figures are for.
 
-Finding the village: if the message names a selected village (place_osm), call place_threats with it. If the person names a village, call search_places, then place_threats on the right match; if several different places match and you cannot tell which one, ask which district. If place_threats says known is false, say clearly that this village is not covered by our analysis and that we have no data for it; do not say it is safe. If a tool fails or a value is null, say that this information is not available.
+Tools: each round of tool calls costs the person several seconds of waiting. If the first message already carries the data you need, answer straight away without calling any tool. Otherwise ask for every tool you need in the same turn, several calls at once, instead of one after another.
+
+Finding the village: if the first message carries data for a selected village, that is the asker's village; use it and do not call place_threats for it again. If it only names a selected village (place_osm), call place_threats with it. If the person names another village, call search_places, then place_threats on the right match; if several different places match and you cannot tell which one, ask which district. If place_threats says known is false, say clearly that this village is not covered by our analysis and that we have no data for it; do not say it is safe. If a tool fails or a value is null or missing, say that this information is not available.
 
 Never say or hint when a lake will burst, or whether it will: nobody can predict that. You can only say what the measurements show and how long water would take to arrive if a lake did burst.
 
-Whenever the answer involves flood danger to a place or to people, call what_to_do and end with its advice to move to high ground away from the river ("ऊँचे स्थान पर जाएँ"), using its wording, and mention 112 or 1077 when help may be needed.
+Whenever the answer involves flood danger to a place or to people, end with the safety advice to move to high ground away from the river (%s), using the wording of the safety advice in the first message (the what_to_do tool returns the same text), and mention 112 or 1077 when help may be needed.
 
 If the question is not about glacial lakes, floods, these villages, or staying safe, say in one sentence that you can only help with glacial lake flood questions.`
 
 var languageRule = map[string]string{
-	LangHindi:   "Answer in simple Hindi in Devanagari script. Write digits as 0-9.",
-	LangEnglish: "Answer in simple English.",
+	LangHindi: "Answer in simple Hindi in Devanagari script. Write digits as 0-9.",
+	LangEnglish: "Answer in simple English only. Do not write a single Hindi word or Devanagari character, not even in " +
+		"brackets after an English word; write village and lake names in Latin letters. This holds even if the " +
+		"question itself is written in Hindi.",
+}
+
+var riskWords = map[string]string{
+	LangHindi:   "low = कम, moderate = मध्यम, high = अधिक, very_high = बहुत अधिक",
+	LangEnglish: "say low, moderate, high or very high",
+}
+
+var highGroundPhrase = map[string]string{
+	LangHindi:   `"ऊँचे स्थान पर जाएँ"`,
+	LangEnglish: `"move to high ground"`,
+}
+
+func systemFor(lang string) string {
+	return fmt.Sprintf(systemPrompt, languageRule[lang], riskWords[lang], highGroundPhrase[lang])
+}
+
+// firstMessage is the opening user turn: the selected village and its threats when they could
+// be looked up (so the model needs no tool round for the common question), the fixed safety
+// advice, then the question.
+func firstMessage(req Request, threats string) string {
+	var b strings.Builder
+	switch {
+	case threats != "":
+		fmt.Fprintf(&b, "[Selected village: place_osm = %s. Its data, already looked up (the result of place_threats for it):]\n%s\n\n", req.PlaceOSM, threats)
+	case req.PlaceOSM != "":
+		fmt.Fprintf(&b, "[Selected village: place_osm = %s]\n\n", req.PlaceOSM)
+	}
+	fmt.Fprintf(&b, "[Safety advice (the result of what_to_do):]\n%s\n\n[Question:]\n%s", encode(whatToDo(req.Lang)), req.Question)
+	return b.String()
 }
 
 // Ask answers one question. It returns ErrInvalid for a bad request, and another error only
@@ -117,36 +154,48 @@ func (s *Service) Ask(ctx context.Context, req Request) (*Answer, error) {
 	modelCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	user := req.Question
-	if req.PlaceOSM != "" {
-		user = "[Selected village: place_osm = " + req.PlaceOSM + "]\n" + user
-	}
-	conv := NewConversation(fmt.Sprintf(systemPrompt, languageRule[req.Lang]), askTools, user)
-	runner := Runner{Client: s.Client, Model: s.Model, MaxTokens: defaultMaxTokens, MaxRounds: defaultMaxRounds}
 	tools := apiTools{api: s.API}
 	exec := tools.exec(req.Lang)
 
+	// The selected village's threats are fetched here rather than by the model: one model round
+	// less for the most common question. The lookup counts as a call, so its numbers may be said
+	// and it is listed in the sources.
+	var prefetched []Call
+	threats := ""
+	if req.PlaceOSM != "" {
+		args := map[string]any{"osm": req.PlaceOSM}
+		if result, err := exec(modelCtx, toolPlaceThreats, args); err != nil {
+			s.log().Warn("assistant could not look up the selected village", "osm", req.PlaceOSM, "err", err)
+		} else {
+			threats = result
+			prefetched = append(prefetched, Call{Tool: toolPlaceThreats, Args: args, Result: result})
+		}
+	}
+	conv := NewConversation(systemFor(req.Lang), askTools, firstMessage(req, threats))
+	conv.Calls = prefetched
+	runner := Runner{Client: s.Client, Model: s.Model, MaxTokens: defaultMaxTokens, MaxRounds: defaultMaxRounds}
+
 	text, err := runner.Run(modelCtx, conv, exec)
-	var bad []string
+	var bad problems
 	if err == nil {
-		if bad = unsupported(conv, text); len(bad) > 0 || text == "" {
-			s.log().Warn("assistant answer failed the number check, retrying", "numbers", bad)
-			conv.Say(correction(bad))
+		if bad = check(conv, text, req.Lang); !bad.none() {
+			s.log().Warn("assistant answer failed its checks, retrying", "numbers", bad.numbers, "devanagari", bad.devanagari, "empty", bad.empty)
+			conv.Say(bad.correction())
 			if text, err = runner.Run(modelCtx, conv, exec); err == nil {
-				bad = unsupported(conv, text)
+				bad = check(conv, text, req.Lang)
 			}
 		}
 	}
 
 	ans := &Answer{Lang: req.Lang, Mode: ModeModel, Answer: text}
-	if err != nil || len(bad) > 0 || text == "" {
+	if err != nil || !bad.none() {
 		if err != nil {
 			s.log().Error("assistant model call failed", "err", err)
 			if len(conv.Calls) == 0 && req.PlaceOSM == "" {
 				return nil, err
 			}
 		} else {
-			s.log().Warn("assistant answer failed the number check twice, using the template", "numbers", bad)
+			s.log().Warn("assistant answer failed its checks twice, using the template", "numbers", bad.numbers, "devanagari", bad.devanagari, "empty", bad.empty)
 		}
 		// The template reads local data only, so it does not need what is left of the model's time.
 		ans.Mode = ModeTemplate
@@ -173,18 +222,48 @@ func (s *Service) log() *slog.Logger {
 	return s.Log
 }
 
-func unsupported(conv *Conversation, answer string) []string {
-	return NewAllowed(CallResults(conv.Calls)...).Unsupported(answer)
+// problems are the reasons an answer may not be sent as written.
+type problems struct {
+	numbers    []string // numbers that are in no tool result
+	devanagari bool     // Hindi text in an English answer
+	empty      bool
 }
 
-func correction(bad []string) string {
-	if len(bad) == 0 {
+func (p problems) none() bool { return len(p.numbers) == 0 && !p.devanagari && !p.empty }
+
+// check tests an answer: every number must come from the conversation's tool results, and an
+// English answer must not contain Devanagari.
+func check(conv *Conversation, answer, lang string) problems {
+	return problems{
+		numbers:    NewAllowed(CallResults(conv.Calls)...).Unsupported(answer),
+		devanagari: lang == LangEnglish && HasDevanagari(answer),
+		empty:      answer == "",
+	}
+}
+
+// HasDevanagari reports whether text contains any Devanagari character (letters, signs or digits).
+func HasDevanagari(text string) bool {
+	return strings.ContainsFunc(text, func(r rune) bool { return unicode.Is(unicode.Devanagari, r) })
+}
+
+// correction tells the model what was wrong with its answer, for the one retry.
+func (p problems) correction() string {
+	if p.empty {
 		return "Your reply was empty. Answer the question now, following every rule."
 	}
-	return "Your answer was not sent, because it contains numbers that are not in any tool result: " +
-		strings.Join(bad, ", ") + ". Write the answer again. Every number must be copied exactly from a tool " +
-		"result (call a tool if you need the figure); do not calculate, convert or round. If the figure is " +
-		"not in the data, leave it out or say it is not available."
+	var b strings.Builder
+	b.WriteString("Your answer was not sent.")
+	if len(p.numbers) > 0 {
+		b.WriteString(" It contains numbers that are not in any tool result: " + strings.Join(p.numbers, ", ") +
+			". Every number must be copied exactly from a tool result (call a tool if you need the figure); do not " +
+			"calculate, convert or round. If the figure is not in the data, leave it out or say it is not available.")
+	}
+	if p.devanagari {
+		b.WriteString(" It contains Hindi (Devanagari) text, but this person reads English only. Use English words " +
+			"and Latin letters for everything, names included, with no Hindi in brackets.")
+	}
+	b.WriteString(" Write the answer again.")
+	return b.String()
 }
 
 func sources(calls []Call) []Source {

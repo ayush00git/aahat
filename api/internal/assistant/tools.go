@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -25,7 +26,8 @@ const (
 var askTools = []Tool{
 	{
 		Name: toolSearchPlaces,
-		Description: "Find villages and towns by name (English or Hindi; a prefix is enough). Returns up to 8 matches with " +
+		Description: "Find villages and towns by name (English or Hindi; a prefix is enough, and spelling variants such as " +
+			"Sisu for Sissu are matched). Returns up to 8 matches with " +
 			"their osm id, district and whether our flood analysis covers them. Use the osm id with place_threats.",
 		Schema: objectSchema("q", "Village or town name, or the start of it"),
 	},
@@ -33,7 +35,17 @@ var askTools = []Tool{
 		Name: toolPlaceThreats,
 		Description: "Flood threat to one village from the monitored glacial lakes: whether it is covered by the analysis " +
 			"(known), whether it is outside every flood path (safe), and for each threatening lake the risk level, " +
-			"distance along the river (km) and minutes until the water could arrive (minutes_to_say is the figure to quote).",
+			"distance along the river (km) and minutes until the water could arrive (minutes_to_say is the figure to quote). " +
+			"if_lake_bursts gives, for the expected flood and for the larger severe flood: " +
+			"status (flooded = the flood reaches the village's mapped point; margin = the flood passes within 300 m and " +
+			"the ground is less than 10 m above it, so houses near the river may be reached; outside = not reached); " +
+			"river_water_depth_m = how deep the flood water would be in the river beside the village, measured from the " +
+			"river bed (it is the depth in the river channel, NOT the depth of water in the village); " +
+			"village_ground (below_flood_level, above_flood_level or at_flood_level) with village_ground_m = how many " +
+			"metres the ground at the village's mapped point is below or above the level the flood water would reach. " +
+			"Say it like: \"the river water would be about 6.2 m deep; the village ground is 1.2 m below the flood " +
+			"level\". Only status says whether the village is reached: ground below the flood level with status margin " +
+			"or outside lies behind higher ground. A missing value means it is not available.",
 		Schema: objectSchema("osm", "OSM id of the place, like node/123456"),
 	},
 	{
@@ -93,8 +105,42 @@ func (t apiTools) exec(lang string) Exec {
 		if err != nil {
 			return "", err
 		}
-		return encode(v), nil
+		return forLang(encode(v), lang), nil
 	}
+}
+
+// forLang prepares a tool result for a conversation in lang. An English conversation gets no
+// Hindi names or labels (the "..._hi" fields): shown to the model, they end up in the answer.
+// Numbers keep their exact text.
+func forLang(result, lang string) string {
+	if lang != LangEnglish || !strings.Contains(result, `_hi"`) {
+		return result
+	}
+	dec := json.NewDecoder(strings.NewReader(result))
+	dec.UseNumber()
+	var v any
+	if dec.Decode(&v) != nil {
+		return result
+	}
+	return encode(dropHindi(v))
+}
+
+func dropHindi(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, child := range t {
+			if strings.HasSuffix(k, "_hi") {
+				delete(t, k)
+			} else {
+				t[k] = dropHindi(child)
+			}
+		}
+	case []any:
+		for i := range t {
+			t[i] = dropHindi(t[i])
+		}
+	}
+	return v
 }
 
 func encode(v any) string {
@@ -140,7 +186,7 @@ func (r *recorder) Write(b []byte) (int, error) { return r.body.Write(b) }
 type placeMatch struct {
 	OSM      string  `json:"osm"`
 	Name     *string `json:"name"`
-	NameHi   *string `json:"name_hi"`
+	NameHi   *string `json:"name_hi,omitempty"`
 	District *string `json:"district,omitempty"`
 	Covered  bool    `json:"covered"`
 }
@@ -164,11 +210,57 @@ func (t apiTools) searchPlaces(ctx context.Context, q string) (any, error) {
 	return out, nil
 }
 
+// scenarioPair holds a value for the expected flood and for the severe one.
+type scenarioPair[T any] struct {
+	Expected T `json:"expected"`
+	Severe   T `json:"severe"`
+}
+
+// Where a place's ground lies relative to the flood level.
+const (
+	groundBelow = "below_flood_level"
+	groundAbove = "above_flood_level"
+	groundAt    = "at_flood_level"
+)
+
+// floodOutcome is what one flood scenario means for a place, in words the model can repeat.
+type floodOutcome struct {
+	Status string `json:"status,omitempty"` // flooded | margin | outside
+	// RiverWaterDepthM is the API's flood_depth_m: the depth of the flood in the river at the
+	// cross-section nearest the place, above the river bed. It is not the depth in the village.
+	RiverWaterDepthM *float64 `json:"river_water_depth_m,omitempty"`
+	// VillageGround and VillageGroundM are the API's height_above_flood_m (ground at the place's
+	// mapped point minus the flood level; negative = below it) split into a side and a positive
+	// distance, so the model never has to read a sign.
+	VillageGround  string   `json:"village_ground,omitempty"`
+	VillageGroundM *float64 `json:"village_ground_m,omitempty"`
+}
+
+func newFloodOutcome(status string, depth, height *float64) *floodOutcome {
+	if status == "" && depth == nil && height == nil {
+		return nil
+	}
+	o := &floodOutcome{Status: status, RiverWaterDepthM: depth}
+	if height != nil {
+		abs := math.Abs(*height)
+		o.VillageGroundM = &abs
+		switch {
+		case *height < 0:
+			o.VillageGround = groundBelow
+		case *height > 0:
+			o.VillageGround = groundAbove
+		default:
+			o.VillageGround = groundAt
+		}
+	}
+	return o
+}
+
 // placeThreat is one lake's threat to a place, as GET /places/{osm}/threats reports it.
 type placeThreat struct {
 	LakeID             string   `json:"lake_id"`
 	LakeName           string   `json:"lake_name"`
-	LakeNameHi         string   `json:"lake_name_hi"`
+	LakeNameHi         string   `json:"lake_name_hi,omitempty"`
 	RiskLevel          string   `json:"risk_level"`
 	RiskScore          *float64 `json:"risk_score"`
 	Status             string   `json:"status"`
@@ -178,12 +270,42 @@ type placeThreat struct {
 	// MinutesToSay is ArrivalMinFast rounded down, as the alerts say it: a warning never promises
 	// more time than the data gives.
 	MinutesToSay *int `json:"minutes_to_say"`
+	// IfLakeBursts is built from the three per-scenario fields below, which are read from the API
+	// and not passed on.
+	IfLakeBursts *scenarioPair[*floodOutcome] `json:"if_lake_bursts,omitempty"`
+
+	ScenarioStatus    *scenarioPair[string]   `json:"scenario_status,omitempty"`
+	FloodDepthM       *scenarioPair[*float64] `json:"flood_depth_m,omitempty"`
+	HeightAboveFloodM *scenarioPair[*float64] `json:"height_above_flood_m,omitempty"`
+}
+
+// describeScenarios turns the API's per-scenario fields into IfLakeBursts.
+func (t *placeThreat) describeScenarios() {
+	var status scenarioPair[string]
+	var depth, height scenarioPair[*float64]
+	if t.ScenarioStatus != nil {
+		status = *t.ScenarioStatus
+	}
+	if t.FloodDepthM != nil {
+		depth = *t.FloodDepthM
+	}
+	if t.HeightAboveFloodM != nil {
+		height = *t.HeightAboveFloodM
+	}
+	t.ScenarioStatus, t.FloodDepthM, t.HeightAboveFloodM = nil, nil, nil
+	pair := scenarioPair[*floodOutcome]{
+		Expected: newFloodOutcome(status.Expected, depth.Expected, height.Expected),
+		Severe:   newFloodOutcome(status.Severe, depth.Severe, height.Severe),
+	}
+	if pair.Expected != nil || pair.Severe != nil {
+		t.IfLakeBursts = &pair
+	}
 }
 
 type placeThreats struct {
 	OSM      string        `json:"osm"`
 	Name     *string       `json:"name"`
-	NameHi   *string       `json:"name_hi"`
+	NameHi   *string       `json:"name_hi,omitempty"`
 	District *string       `json:"district,omitempty"`
 	Known    bool          `json:"known"`
 	Safe     bool          `json:"safe"`
@@ -206,6 +328,7 @@ func (t apiTools) placeThreats(ctx context.Context, osm string) (*placeThreats, 
 				floor := int(math.Floor(*m))
 				list[i].MinutesToSay = &floor
 			}
+			list[i].describeScenarios()
 		}
 	}
 	switch {
