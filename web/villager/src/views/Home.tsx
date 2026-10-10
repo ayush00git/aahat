@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { searchPlaces, type Place } from '../api';
 import { STRINGS, useI18n } from '../i18n';
-import { altName, placeName } from '../format';
+import { adminLine, altName, placeName } from '../format';
 import { href } from '../router';
 import { getLastPlace } from '../storage';
 import { rememberCoords } from '../coords';
@@ -97,6 +97,7 @@ export function Home() {
                   <span class="result-text">
                     <span class="result-name">{placeName(p, lang)}</span>
                     {altName(p, lang) && <span class="result-alt">{altName(p, lang)}</span>}
+                    {adminLine(p, t.districtLine) && <span class="result-admin">{adminLine(p, t.districtLine)}</span>}
                   </span>
                   {p.covered === true && (
                     <span class="pill pill-covered" title={t.coveredHelp}>

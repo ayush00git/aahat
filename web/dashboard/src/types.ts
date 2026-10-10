@@ -15,6 +15,20 @@ export interface YearRecord {
   uncertainty_m2: number | null;
   coverage: number | null;
   scenes_clear: number | null;
+  /** Sentinel-2 items the year's outline was built from (newer pipeline runs only). */
+  scene_ids?: string[];
+  scene_days?: string[];
+}
+
+/** The latest sudden-drainage check of a lake (pipeline drain.py), as the index carries it. */
+export interface DrainSummary {
+  as_of?: string | null;
+  drained?: boolean;
+  /** Share of the season composite's area lost on the latest clear scene (0.41 = fell 41%). */
+  drop_fraction?: number | null;
+  status?: "ok" | "no_clear_scene" | "frozen_or_snow" | "not_found" | string;
+  latest_day?: string | null;
+  latest?: { day?: string | null } | string | null;
 }
 
 export interface IndexRisk {
@@ -63,6 +77,56 @@ export interface Lake {
   latest: YearRecord | null;
   risk: IndexRisk | null;
   downstream: IndexDownstream | null;
+  drain?: DrainSummary | null;
+}
+
+export type WeatherLevel = "normal" | "elevated" | "high";
+
+/** One row of GET /weather. */
+export interface WeatherBrief {
+  lake_id: string;
+  level: WeatherLevel;
+  reasons: string[];
+  fetched_at: string;
+  stale: boolean;
+}
+
+export interface WeatherDay {
+  date: string;
+  precipitation_mm: number | null;
+  snowfall_cm: number | null;
+  tmax_c: number | null;
+  tmin_c: number | null;
+  forecast: boolean;
+}
+
+/** GET /lakes/{id}/weather. */
+export interface WeatherOutlook {
+  lake_id: string;
+  fetched_at: string;
+  stale: boolean;
+  source: string;
+  days: WeatherDay[];
+  trigger: { level: WeatherLevel; reasons: string[]; rule: string };
+}
+
+export interface BarrierCandidate {
+  lat: number;
+  lon: number;
+  area_m2: number | null;
+  /** Distance along the river below the lake. The pipeline's own files call it km_along_reach. */
+  km?: number | null;
+  km_along_reach?: number | null;
+  /** Absent in older scans: counts as a possible barrier lake. */
+  kind?: "possible_barrier_lake" | "reservoir_level_change" | string;
+  near_dam_km?: number | null;
+}
+
+/** GET /lakes/{id}/barrier: the latest scan of the river below the lake for new water. */
+export interface BarrierScan {
+  lake_id?: string;
+  as_of: string;
+  candidates: BarrierCandidate[];
 }
 
 export interface LakeIndex {

@@ -46,3 +46,19 @@ export function altName(p: Named, lang: Lang): string | null {
 
 export const lakeName = (t: Pick<Threat, 'lake_name' | 'lake_name_hi'>, lang: Lang) =>
   (lang === 'hi' ? t.lake_name_hi : t.lake_name) || t.lake_name || t.lake_name_hi;
+
+const HOME_STATE = 'himachal pradesh';
+
+/**
+ * "Hamirpur district" (plus the state when it is not Himachal Pradesh), so
+ * two villages of the same name can be told apart. Null when the API gave neither.
+ */
+export function adminLine(
+  p: { district?: string | null; state?: string | null },
+  districtText: (d: string) => string,
+): string | null {
+  const parts: string[] = [];
+  if (p.district) parts.push(districtText(p.district));
+  if (p.state && p.state.trim().toLowerCase() !== HOME_STATE) parts.push(p.state);
+  return parts.length ? parts.join(', ') : null;
+}

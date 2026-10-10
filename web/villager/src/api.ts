@@ -21,6 +21,9 @@ export interface Place {
    * Newer API only: a missing field means "not known", so no badge is shown.
    */
   covered?: boolean;
+  /** Admin areas the place lies in (newer API); tell same-named villages apart. */
+  district?: string | null;
+  state?: string | null;
 }
 
 export interface Pair<T> {
@@ -59,6 +62,8 @@ export interface Threats {
   nearby?: Threat[];
   lon?: number | null;
   lat?: number | null;
+  district?: string | null;
+  state?: string | null;
 }
 
 export type Channel = 'sms' | 'voice' | 'webpush';
@@ -218,6 +223,37 @@ export async function getLakes(): Promise<LakeSummary[]> {
     if (saved) return saved;
     throw err;
   }
+}
+
+export type WeatherLevel = 'normal' | 'elevated' | 'high';
+
+/** One row of GET /weather: the short-term weather trigger for a lake. */
+export interface LakeWeather {
+  lake_id: string;
+  level: WeatherLevel;
+  reasons: string[];
+  fetched_at: string;
+  stale: boolean;
+}
+
+let weatherMemo: Promise<Map<string, LakeWeather>> | null = null;
+
+/**
+ * getWeather fetches GET /weather once per app session and indexes it by
+ * lake. It never rejects: without an answer the map is empty and the app
+ * simply shows no weather line (a failed fetch is retried on the next call).
+ */
+export function getWeather(): Promise<Map<string, LakeWeather>> {
+  if (!weatherMemo) {
+    weatherMemo = request<LakeWeather[]>('/weather').then(
+      (rows) => new Map((Array.isArray(rows) ? rows : []).filter((r) => r && r.lake_id).map((r) => [r.lake_id, r])),
+      () => {
+        weatherMemo = null;
+        return new Map<string, LakeWeather>();
+      },
+    );
+  }
+  return weatherMemo;
 }
 
 export const layerURL = (lakeId: string, name: string) =>

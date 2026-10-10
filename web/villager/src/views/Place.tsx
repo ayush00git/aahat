@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'preact/hooks';
 import { getLakes, type LakeSummary, type Threats } from '../api';
 import { STRINGS, useI18n, type Lang, type Strings } from '../i18n';
-import { altName, dateTime, lakeName, num, placeName, wholeMinutes } from '../format';
+import { adminLine, altName, dateTime, lakeName, num, placeName, wholeMinutes } from '../format';
 import { href } from '../router';
-import { placeCoords, rememberedNames } from '../coords';
+import { placeCoords, rememberedAdmin, rememberedNames } from '../coords';
 import { nearestLakes, type LonLat } from '../nearest';
 import { placeLink } from '../share';
 import { usePlace, type PlaceState } from '../usePlace';
-import { NearbyCard, ThreatCard } from './ThreatCard';
+import { NearbyCard, ThreatCard, WeatherLine } from './ThreatCard';
 import { Actions, EmergencyNumbers } from './Actions';
 import { MySubscriptions } from './MySubscriptions';
 import { ShareButton } from './Share';
@@ -28,6 +28,8 @@ export function PlaceView({ osm }: { osm: string }) {
   const named = names(data);
   const name = placeName(named, lang);
   const alt = altName(named, lang);
+  // District from the API's answer, else from the search result that led here.
+  const admin = adminLine(data.district || data.state ? data : (rememberedAdmin(osm) ?? {}), t.districtLine);
   const nearby = data.nearby ?? [];
   const danger = data.threats.length > 0;
   const shareText = shareMessage(data, name, t, lang);
@@ -38,6 +40,7 @@ export function PlaceView({ osm }: { osm: string }) {
       <div class="place-head">
         <h1 class="place-name">{name}</h1>
         {alt && <p class="place-alt">{alt}</p>}
+        {admin && <p class="place-admin">{admin}</p>}
       </div>
 
       {savedAt && (
@@ -219,6 +222,7 @@ function LakeList({ lakes }: { lakes: (LakeSummary & { km?: number })[] }) {
               <strong>{t.straightKm(num(Math.round(l.km), lang, 0))}</strong> {t.straightLabel}
             </span>
           )}
+          {l.km !== undefined && <WeatherLine lakeId={l.id} />}
         </li>
       ))}
     </ul>

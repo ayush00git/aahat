@@ -42,6 +42,14 @@ export const IconWarn = (p: P) => (
   </Svg>
 );
 
+/** Rain cloud: the short-term weather outlook. */
+export const IconRain = (p: P) => (
+  <Svg {...p}>
+    <path d="M7 15.5a4.2 4.2 0 0 1-.4-8.4 5.6 5.6 0 0 1 10.8 1.2A3.6 3.6 0 0 1 17 15.5Z" />
+    <path d="M8.5 18.5 7.7 21M12.4 18.5l-.8 2.5M16.3 18.5l-.8 2.5" />
+  </Svg>
+);
+
 /** A house beside moving water: a flood passing nearby. */
 export const IconNearby = (p: P) => (
   <Svg {...p}>

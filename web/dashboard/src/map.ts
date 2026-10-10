@@ -431,6 +431,12 @@ export class MapController {
     if (b) this.map.fitBounds(b, { padding: 80, maxZoom: 9, duration: 900 });
   }
 
+  /** Flies to a point (e.g. a river-blockage candidate) without opening a popup. */
+  focusPoint(lon: number, lat: number) {
+    this.closePopup();
+    this.map.flyTo({ center: [lon, lat], zoom: Math.max(this.map.getZoom(), 13), speed: 1.8, essential: true });
+  }
+
   focusImpact(im: Impact) {
     this.map.flyTo({ center: [im.lon, im.lat], zoom: Math.max(this.map.getZoom(), 13), speed: 1.8, essential: true });
     this.openImpactPopup(im);

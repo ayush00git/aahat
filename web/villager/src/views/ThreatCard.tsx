@@ -1,7 +1,39 @@
-import type { Threat } from '../api';
+import { useEffect, useState } from 'preact/hooks';
+import { getWeather, type LakeWeather, type Threat } from '../api';
 import { useI18n } from '../i18n';
 import { lakeName, num, wholeMinutes } from '../format';
-import { IconClock, IconFlood, IconNearby, IconRiver, IconWarn } from './icons';
+import { IconClock, IconFlood, IconNearby, IconRain, IconRiver, IconWarn } from './icons';
+
+/**
+ * The lake's weather trigger from GET /weather (fetched once, shared): one
+ * line when the level is elevated or high. `quiet` also shows a plain line for
+ * a normal outlook, unless that answer is stale. No numbers: only the level
+ * the API returned. Renders nothing while loading or when the API has no answer.
+ */
+export function WeatherLine({ lakeId, quiet }: { lakeId: string; quiet?: boolean }) {
+  const { t } = useI18n();
+  const [w, setW] = useState<LakeWeather | null>(null);
+  useEffect(() => {
+    let live = true;
+    setW(null);
+    getWeather().then((m) => live && setW(m.get(lakeId) ?? null));
+    return () => {
+      live = false;
+    };
+  }, [lakeId]);
+  if (!w) return null;
+  const text =
+    w.level === 'high' ? t.weatherHigh : w.level === 'elevated' ? t.weatherElevated : w.level === 'normal' && quiet && !w.stale ? t.weatherNormal : null;
+  if (!text) return null;
+  return (
+    <p class={`weather-line weather-${w.level}`}>
+      <IconRain size={20} />
+      <span>
+        {text} <span class="weather-src">{t.weatherSource}</span>
+      </span>
+    </p>
+  );
+}
 
 export function ThreatCard({ threat: th }: { threat: Threat }) {
   const { t, lang } = useI18n();
@@ -50,6 +82,8 @@ export function ThreatCard({ threat: th }: { threat: Threat }) {
             )}
           </ul>
         )}
+
+        <WeatherLine lakeId={th.lake_id} quiet />
 
         <div class="flood">
           <h4 class="flood-title">{t.floodTitle}</h4>

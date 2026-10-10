@@ -1,6 +1,16 @@
 import type { ComponentChildren } from "preact";
-import { hostOf, LEVEL_LABEL, splitLinks, STATUS_LABEL, STATUS_SHORT } from "../format";
-import type { ImpactStatus, RiskLevel } from "../types";
+import { hostOf, LEVEL_LABEL, splitLinks, STATUS_LABEL, STATUS_SHORT, WEATHER_LABEL } from "../format";
+import type { ImpactStatus, RiskLevel, WeatherLevel } from "../types";
+
+/** Weather trigger level (GET /weather). */
+export function WeatherBadge({ level }: { level: WeatherLevel }) {
+  return (
+    <span class={`badge wx-${level}`}>
+      <span class="badge-dot" aria-hidden="true" />
+      {WEATHER_LABEL[level] ?? level}
+    </span>
+  );
+}
 
 export function LevelBadge({ level, compact }: { level: RiskLevel | null | undefined; compact?: boolean }) {
   if (!level) return <span class="badge level-none">Unscored</span>;

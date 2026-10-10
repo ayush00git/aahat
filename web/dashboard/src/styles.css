@@ -2162,3 +2162,131 @@ code,
     bottom: 40px;
   }
 }
+
+/* ---------- weather trigger, drainage check, river blockage scan ---------- */
+
+.lake-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.wx-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.wx-dot-elevated {
+  background: var(--lv-moderate);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-moderate) 22%, transparent);
+}
+.wx-dot-high {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+.wx-normal .badge-dot {
+  background: var(--ok);
+}
+.wx-elevated {
+  background: color-mix(in srgb, var(--lv-moderate) 14%, transparent);
+  color: #f2d48a;
+}
+.wx-elevated .badge-dot {
+  background: var(--lv-moderate);
+}
+.wx-high {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: #ffaca6;
+}
+.wx-high .badge-dot {
+  background: var(--danger);
+}
+.wx-stale {
+  font-size: var(--fs-xs);
+  color: var(--warn-ink);
+}
+.wx-reasons {
+  margin: 0 0 8px;
+  padding-left: 16px;
+  color: var(--ink-2);
+}
+.wx-reasons li + li {
+  margin-top: 4px;
+}
+.table.weather td {
+  white-space: nowrap;
+}
+.drain-flag {
+  margin: 16px 0 0;
+  font-size: var(--fs-sm);
+}
+.drain-flag b {
+  color: #ffd9d5;
+}
+.drain-line {
+  margin: -16px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+.drain-line.drained {
+  color: #ffaca6;
+}
+.scene-toggle {
+  margin-top: 2px;
+  cursor: pointer;
+}
+.table tr.scenes-open td {
+  border-bottom-color: transparent;
+}
+.table tr.scene-row td {
+  padding-top: 0;
+}
+.scene-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 2px 16px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.scene-list li {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.scene-list span {
+  flex: none;
+}
+.scene-list a {
+  overflow-wrap: anywhere;
+}
+.barrier-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.barrier-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.barrier-list li:first-child {
+  padding-top: 0;
+}
+.barrier-hit .barrier-facts {
+  font-weight: 600;
+}
+.barrier-res {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.barrier-list .link-btn {
+  margin-left: auto;
+  cursor: pointer;
+}

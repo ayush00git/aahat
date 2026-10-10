@@ -6,7 +6,7 @@ import { load, save } from './storage';
 
 type LonLat = [number, number];
 
-type Names = [string | null, string | null];
+type Names = [string | null, string | null, (string | null)?, (string | null)?];
 
 /** Keeps a store to its most recent `max` entries. */
 function trim<T>(all: Record<string, T>, max = 200): Record<string, T> {
@@ -20,7 +20,7 @@ export function rememberCoords(places: Place[]): void {
   const names = load<Record<string, Names>>('names') ?? {};
   for (const p of places) {
     all[p.osm] = [p.lon, p.lat];
-    names[p.osm] = [p.name, p.name_hi];
+    names[p.osm] = [p.name, p.name_hi, p.district ?? null, p.state ?? null];
   }
   save('coords', trim(all));
   save('names', trim(names));
@@ -33,6 +33,12 @@ export function rememberCoords(places: Place[]): void {
 export function rememberedNames(osm: string): { name: string | null; name_hi: string | null } | null {
   const n = load<Record<string, Names>>('names')?.[osm];
   return n ? { name: n[0], name_hi: n[1] } : null;
+}
+
+/** The district and state a search result gave for a place, if any. */
+export function rememberedAdmin(osm: string): { district: string | null; state: string | null } | null {
+  const n = load<Record<string, Names>>('names')?.[osm];
+  return n && (n[2] || n[3]) ? { district: n[2] ?? null, state: n[3] ?? null } : null;
 }
 
 export async function placeCoords(osm: string, names: (string | null)[]): Promise<LonLat | null> {

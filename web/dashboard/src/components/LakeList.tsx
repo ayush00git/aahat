@@ -1,5 +1,5 @@
 import { num } from "../format";
-import type { Lake } from "../types";
+import type { Lake, WeatherBrief } from "../types";
 import { LevelBadge } from "./ui";
 
 /** Ranked by risk score, highest first; unscored lakes last. */
@@ -11,10 +11,13 @@ export function LakeList({
   lakes,
   selectedId,
   onSelect,
+  weather,
 }: {
   lakes: Lake[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Weather trigger per lake id; only elevated and high are marked. */
+  weather?: Map<string, WeatherBrief>;
 }) {
   const ranked = rankLakes(lakes);
   return (
@@ -24,17 +27,24 @@ export function LakeList({
         <span class="muted">{lakes.length} · by risk</span>
       </div>
       <ol class="lake-list">
-        {ranked.map((l) => (
+        {ranked.map((l) => {
+          const w = weather?.get(l.id);
+          const wx = w && (w.level === "elevated" || w.level === "high") ? w : null;
+          const wxTitle = wx ? `Weather ${wx.level}${wx.reasons?.[0] ? `: ${wx.reasons[0]}` : ""}` : "";
+          return (
           <li key={l.id}>
             <button
               type="button"
               class={`lake-row${l.id === selectedId ? " selected" : ""}`}
               onClick={() => onSelect(l.id)}
               aria-current={l.id === selectedId ? "true" : undefined}
-              title={`${l.district} · ${l.kind}`}
+              title={`${l.district} · ${l.kind}${wx ? `\n${wxTitle}` : ""}`}
             >
               <span class="lake-main">
-                <span class="lake-name">{l.name}</span>
+                <span class="lake-name-row">
+                  <span class="lake-name">{l.name}</span>
+                  {wx && <span class={`wx-dot wx-dot-${wx.level}`} role="img" aria-label={wxTitle} title={wxTitle} />}
+                </span>
                 <span class="lake-hi hi" lang="hi">
                   {l.name_hi}
                 </span>
@@ -45,7 +55,8 @@ export function LakeList({
               </span>
             </button>
           </li>
-        ))}
+          );
+        })}
       </ol>
     </nav>
   );

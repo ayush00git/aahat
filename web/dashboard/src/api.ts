@@ -1,5 +1,6 @@
 import type {
   AlertEvent,
+  BarrierScan,
   DownstreamFile,
   GeoJSONDoc,
   Impact,
@@ -7,6 +8,8 @@ import type {
   LayerName,
   RiskFile,
   ScenarioName,
+  WeatherBrief,
+  WeatherOutlook,
 } from "./types";
 import { getToken, requireSignIn } from "./auth";
 
@@ -63,6 +66,9 @@ export const api = {
   downstream: (id: string) => request<DownstreamFile>(`/lakes/${enc(id)}/downstream`),
   impacts: (id: string) =>
     request<Impact[]>(`/lakes/${enc(id)}/impacts?status=in_flood_path,at_risk`),
+  weather: () => request<WeatherBrief[]>("/weather"),
+  lakeWeather: (id: string) => request<WeatherOutlook>(`/lakes/${enc(id)}/weather`),
+  barrier: (id: string) => request<BarrierScan>(`/lakes/${enc(id)}/barrier`),
   layer: (id: string, name: LayerName) => request<GeoJSONDoc>(`/lakes/${enc(id)}/layers/${enc(name)}`),
   trigger: (lakeId: string, scenario: ScenarioName, note: string, dryRun: boolean) =>
     request<AlertEvent>(

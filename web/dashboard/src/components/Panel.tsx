@@ -1,5 +1,5 @@
 import { dateOnly, km2, num } from "../format";
-import type { DownstreamFile, Impact, Lake, LakeLayers, RiskFile } from "../types";
+import type { BarrierScan, DownstreamFile, Impact, Lake, LakeLayers, RiskFile, WeatherOutlook } from "../types";
 import { AlertsTab } from "./AlertsTab";
 import { EvidenceTab } from "./EvidenceTab";
 import { ExposureTab } from "./ExposureTab";
@@ -23,6 +23,9 @@ export interface LakeDetail {
   risk: RiskFile | null;
   downstream: DownstreamFile | null;
   impacts: Impact[] | null;
+  /** Optional extras: null when the API has no answer for the lake. */
+  weather: WeatherOutlook | null;
+  barrier: BarrierScan | null;
   errors: Partial<Record<"risk" | "downstream" | "impacts" | "layers", string>>;
 }
 
@@ -35,6 +38,7 @@ export function Panel({
   onTab,
   onClose,
   onFocusImpact,
+  onFocusPoint,
 }: {
   lake: Lake;
   detail: LakeDetail | null;
@@ -44,8 +48,10 @@ export function Panel({
   onTab: (t: TabId) => void;
   onClose: () => void;
   onFocusImpact: (im: Impact) => void;
+  onFocusPoint: (lon: number, lat: number) => void;
 }) {
   const ds = lake.downstream;
+  const drain = lake.drain;
   const settlements = ds?.exposed_counts?.settlement;
   return (
     <aside class="panel" aria-label={`${lake.name} details`}>
@@ -97,6 +103,15 @@ export function Panel({
             <dd>{dateOnly(lake.risk?.data_until)}</dd>
           </div>
         </dl>
+        {drain?.drained === true && (
+          <p class="flag danger drain-flag" role="alert">
+            <b>Possible sudden drainage:</b>{" "}
+            {typeof drain.drop_fraction === "number"
+              ? `area fell ${num(drain.drop_fraction * 100, 0)}% since the season composite`
+              : "area fell sharply since the season composite"}
+            {drain.as_of ? ` (satellite check of ${dateOnly(drain.as_of)})` : ""}. Verify before acting.
+          </p>
+        )}
       </header>
       <div class="tabs" role="tablist">
         {TABS.map((t) => (
@@ -120,7 +135,7 @@ export function Panel({
         ))}
       </div>
       <div class="tabpanel" id="tabpanel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {renderTab(tab, lake, detail, layers, loading, onFocusImpact)}
+        {renderTab(tab, lake, detail, layers, loading, onFocusImpact, onFocusPoint)}
       </div>
     </aside>
   );
@@ -133,16 +148,26 @@ function renderTab(
   layers: LakeLayers | null,
   loading: boolean,
   onFocus: (im: Impact) => void,
+  onFocusPoint: (lon: number, lat: number) => void,
 ) {
   switch (tab) {
     case "risk":
-      if (d?.risk) return <RiskTab risk={d.risk} />;
+      if (d?.risk) return <RiskTab risk={d.risk} weather={d.weather} />;
       if (d?.errors.risk) return <ErrorMsg msg={`Risk assessment unavailable: ${d.errors.risk}`} />;
       return loading ? <Loading what="risk assessment" /> : null;
     case "growth":
       return <GrowthTab lake={lake} risk={d?.risk ?? null} />;
     case "exposure":
-      if (d?.impacts) return <ExposureTab lake={lake} downstream={d.downstream} impacts={d.impacts} onFocus={onFocus} />;
+      if (d?.impacts) return (
+          <ExposureTab
+            lake={lake}
+            downstream={d.downstream}
+            impacts={d.impacts}
+            barrier={d.barrier}
+            onFocus={onFocus}
+            onFocusPoint={onFocusPoint}
+          />
+        );
       if (d?.errors.impacts) return <ErrorMsg msg={`Exposure unavailable: ${d.errors.impacts}`} />;
       return loading ? <Loading what="downstream exposure" /> : null;
     case "evidence":

@@ -1,10 +1,46 @@
+import { Fragment } from "preact";
+import { useState } from "preact/hooks";
 import { dateOnly, DASH, km2, num, YEAR_STATUS_LABEL } from "../format";
-import type { GeoJSONDoc, Lake, RiskFile, YearRecord, YearStatus } from "../types";
+import type { DrainSummary, GeoJSONDoc, Lake, RiskFile, YearRecord, YearStatus } from "../types";
 import { Section } from "./ui";
 
 /** Where the method is written up (README section on lake mapping). */
 const METHOD_URL = "https://github.com/ayush00git/aahat#how-lake-mapping-works";
 const EARTH_SEARCH_URL = "https://registry.opendata.aws/sentinel-2-l2a-cogs/";
+/** The STAC item of one scene (the catalogue the pipeline reads, pipeline/src/aahat/stac.py). */
+const stacItemUrl = (id: string) =>
+  `https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/${encodeURIComponent(id)}`;
+
+function strList(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== "") : [];
+}
+
+const DRAIN_STATUS: Record<string, string> = {
+  ok: "lake clearly seen",
+  no_clear_scene: "no clear scene (cloud or no pass)",
+  frozen_or_snow: "lake frozen or under snow, not assessed",
+  not_found: "no full season outline to compare against",
+};
+
+/** "Last satellite check" from the index's drain summary; null when no check was run. */
+function drainLine(d: DrainSummary | null | undefined): string | null {
+  if (!d || (!d.as_of && !d.status)) return null;
+  const latest = d.latest_day ?? (typeof d.latest === "string" ? d.latest : d.latest?.day) ?? null;
+  const parts = [dateOnly(d.as_of)];
+  if (latest) parts.push(`latest scene ${dateOnly(latest)}`);
+  if (d.status) parts.push(DRAIN_STATUS[d.status] ?? d.status);
+  if (typeof d.drop_fraction === "number") {
+    const pct = num(Math.abs(d.drop_fraction) * 100, 0);
+    parts.push(
+      d.drained
+        ? `possible sudden drainage: area fell ${pct}% since the season composite`
+        : `no sudden loss of water (area ${d.drop_fraction > 0 ? "−" : "+"}${pct}% against the season composite)`,
+    );
+  } else if (d.drained) {
+    parts.push("possible sudden drainage");
+  }
+  return parts.join(" · ");
+}
 
 /** The per-year record as the outlines layer carries it (a superset of the index's YearRecord). */
 interface YearEvidence extends YearRecord {
@@ -12,6 +48,8 @@ interface YearEvidence extends YearRecord {
   first_day: string | null;
   last_day: string | null;
   params: Record<string, unknown> | null;
+  /** Scenes behind the outline, as { day, id } pairs (either may be missing). */
+  scenes: { day: string | null; id: string | null }[];
 }
 
 function str(v: unknown): string | null {
@@ -37,7 +75,14 @@ function evidenceRows(lake: Lake, outlines: GeoJSONDoc | undefined): YearEvidenc
     .map((year) => {
       const rec = lake.years.find((y) => y.year === year);
       const p = props.get(year) ?? {};
+      const ids = strList(rec?.scene_ids).length ? strList(rec?.scene_ids) : strList(p.scene_ids);
+      const days = strList(rec?.scene_days).length ? strList(rec?.scene_days) : strList(p.scene_days);
+      const scenes = Array.from({ length: Math.max(ids.length, days.length) }, (_, i) => ({
+        day: days[i] ?? null,
+        id: ids[i] ?? null,
+      }));
       return {
+        scenes,
         year,
         status: (rec?.status ?? (str(p.status) as YearStatus | null) ?? "no_data") as YearStatus,
         area_m2: rec ? rec.area_m2 : numOrNull(p.area_m2),
@@ -118,6 +163,14 @@ export function EvidenceTab({
   const asOf = risk?.latest.as_of_season ?? lake.risk?.as_of_season;
   const params = rows.find((r) => r.params)?.params ?? null;
   const haveDates = rows.some((r) => r.first_day || r.last_day);
+  const [openYears, setOpenYears] = useState<Set<number>>(new Set());
+  const toggleYear = (y: number) => {
+    const n = new Set(openYears);
+    if (n.has(y)) n.delete(y);
+    else n.add(y);
+    setOpenYears(n);
+  };
+  const drain = drainLine(lake.drain);
 
   return (
     <div class="tab-body">
@@ -137,6 +190,11 @@ export function EvidenceTab({
           <dd>{dateOnly(dataUntil)}</dd>
         </div>
       </dl>
+      {drain && (
+        <p class={`drain-line${lake.drain?.drained ? " drained" : ""}`}>
+          <span class="k">Last satellite check</span> {drain}
+        </p>
+      )}
 
       <Section
         title="By season"
@@ -187,7 +245,8 @@ export function EvidenceTab({
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.year}>
+                <Fragment key={r.year}>
+                <tr class={openYears.has(r.year) ? "scenes-open" : undefined}>
                   <td>{r.year}</td>
                   <td>
                     <YearPill status={r.status} />
@@ -216,8 +275,38 @@ export function EvidenceTab({
                     >
                       View imagery ↗
                     </a>
+                    {r.scenes.length > 0 && (
+                      <button
+                        type="button"
+                        class="link-btn block scene-toggle"
+                        aria-expanded={openYears.has(r.year)}
+                        onClick={() => toggleYear(r.year)}
+                        title={`The Sentinel-2 scenes behind the ${r.year} outline`}
+                      >
+                        {openYears.has(r.year) ? "Hide scenes" : `Scenes (${r.scenes.length})`}
+                      </button>
+                    )}
                   </td>
                 </tr>
+                {openYears.has(r.year) && r.scenes.length > 0 && (
+                  <tr class="scene-row">
+                    <td colSpan={6}>
+                      <ul class="scene-list">
+                        {r.scenes.map((s, i) => (
+                          <li key={i}>
+                            {s.day && <span>{dateOnly(s.day)}</span>}
+                            {s.id && (
+                              <a href={stacItemUrl(s.id)} target="_blank" rel="noopener noreferrer" title="STAC item (Earth Search)">
+                                {s.id}
+                              </a>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
               {rows.length === 0 && (
                 <tr>

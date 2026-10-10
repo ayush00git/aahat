@@ -1,7 +1,7 @@
 // Display formatting only: every number shown comes from the API; these
 // helpers change units and rounding, never the value.
 
-import type { ImpactKind, ImpactStatus, RiskLevel, YearStatus } from "./types";
+import type { ImpactKind, ImpactStatus, RiskLevel, WeatherLevel, YearStatus } from "./types";
 
 const nf = (digits: number) =>
   new Intl.NumberFormat("en-IN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -90,6 +90,12 @@ export const LEVEL_LABEL: Record<RiskLevel, string> = {
   moderate: "Moderate",
   high: "High",
   very_high: "Very high",
+};
+
+export const WEATHER_LABEL: Record<WeatherLevel, string> = {
+  normal: "Normal",
+  elevated: "Elevated",
+  high: "High",
 };
 
 export const STATUS_LABEL: Record<ImpactStatus, string> = {

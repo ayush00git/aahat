@@ -1,6 +1,6 @@
 import { useMemo, useState } from "preact/hooks";
-import { arrival, discharge, DASH, KIND_LABEL, num, STATUS_LABEL, subkind, volume } from "../format";
-import type { DownstreamFile, Impact, ImpactKind, Lake, ScenarioName } from "../types";
+import { arrival, dateOnly, discharge, DASH, KIND_LABEL, num, STATUS_LABEL, subkind, volume } from "../format";
+import type { BarrierCandidate, BarrierScan, DownstreamFile, Impact, ImpactKind, Lake, ScenarioName } from "../types";
 import { MoreToggle, Section, SourceText, StatusBadge } from "./ui";
 
 const KINDS: ImpactKind[] = ["settlement", "school", "health", "bridge", "road", "hydro"];
@@ -16,16 +16,80 @@ function pair(a: number | null | undefined, b: number | null | undefined, signed
   return `${f(a)} /\u200b${f(b)}`;
 }
 
+/** New water on the river below the lake: a landslide dam would show up here first. */
+function BarrierSection({ scan, onFocusPoint }: { scan: BarrierScan; onFocusPoint: (lon: number, lat: number) => void }) {
+  const all = Array.isArray(scan.candidates) ? scan.candidates : [];
+  const kmOf = (c: BarrierCandidate) => c.km ?? c.km_along_reach ?? null;
+  const sorted = [...all].sort((a, b) => (kmOf(a) ?? Infinity) - (kmOf(b) ?? Infinity));
+  const lakes = sorted.filter((c) => c.kind !== "reservoir_level_change");
+  const reservoirs = sorted.filter((c) => c.kind === "reservoir_level_change");
+  const where = (c: BarrierCandidate) =>
+    Number.isFinite(c.lat) && Number.isFinite(c.lon) ? (
+      <button type="button" class="link-btn" onClick={() => onFocusPoint(c.lon, c.lat)} title="Show on map">
+        {c.lat.toFixed(4)}, {c.lon.toFixed(4)}
+      </button>
+    ) : null;
+  const facts = (c: BarrierCandidate) => (
+    <>
+      {num(c.area_m2)} m² · {num(kmOf(c), 1)} km downstream
+    </>
+  );
+  return (
+    <Section title="River blockage scan" aside={<span class="muted">scan of {dateOnly(scan.as_of)}</span>}>
+      {lakes.length === 0 && (
+        <p class="muted">
+          {all.length === 0 ? "No new water on the river" : "No possible barrier lake on the river"} as of{" "}
+          {dateOnly(scan.as_of)}.
+        </p>
+      )}
+      {(lakes.length > 0 || reservoirs.length > 0) && (
+        <ul class="barrier-list">
+          {lakes.map((c, i) => (
+            <li key={`b${i}`} class="barrier-hit">
+              <span class="badge status-in_flood_path">
+                <span class="badge-dot" aria-hidden="true" />
+                Possible barrier lake
+              </span>
+              <span class="barrier-facts">{facts(c)}</span>
+              {where(c)}
+            </li>
+          ))}
+          {reservoirs.map((c, i) => (
+            <li key={`r${i}`} class="barrier-res">
+              <span>
+                Reservoir level change
+                {typeof c.near_dam_km === "number" ? ` (dam ${num(c.near_dam_km, 1)} km away)` : ""} — not a blockage
+              </span>
+              <span class="barrier-facts">{facts(c)}</span>
+              {where(c)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {lakes.length > 0 && (
+        <p class="caption">
+          New water where the river was dry in earlier imagery. A screening result from Sentinel-2: verify on the
+          ground or with fresh imagery.
+        </p>
+      )}
+    </Section>
+  );
+}
+
 export function ExposureTab({
   lake,
   downstream,
   impacts,
+  barrier,
   onFocus,
+  onFocusPoint,
 }: {
   lake: Lake;
   downstream: DownstreamFile | null;
   impacts: Impact[];
+  barrier?: BarrierScan | null;
   onFocus: (im: Impact) => void;
+  onFocusPoint: (lon: number, lat: number) => void;
 }) {
   const [kinds, setKinds] = useState<Set<ImpactKind>>(new Set());
   const [more, setMore] = useState(false);
@@ -258,6 +322,8 @@ export function ExposureTab({
           severe scenario, or just above it. Click a row to show it on the map.
         </p>
       </Section>
+
+      {barrier && barrier.as_of && <BarrierSection scan={barrier} onFocusPoint={onFocusPoint} />}
 
       {downstream?.caveats?.length ? (
         <details class="more more-section">

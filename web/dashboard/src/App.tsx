@@ -7,7 +7,7 @@ import { Panel, TAB_IDS, type LakeDetail, type TabId } from "./components/Panel"
 import { SignInPrompt } from "./components/SignIn";
 import { ErrorMsg, Loading } from "./components/ui";
 import type { MapController } from "./map";
-import { LAYER_NAMES, type Impact, type LakeIndex, type LakeLayers } from "./types";
+import { LAYER_NAMES, type Impact, type LakeIndex, type LakeLayers, type WeatherBrief } from "./types";
 
 interface Loaded {
   detail: LakeDetail;
@@ -24,10 +24,13 @@ function loadLake(id: string): Promise<Loaded> {
   let p = cache.get(id);
   if (!p) {
     p = (async () => {
-      const [risk, downstream, impacts, ...layerRes] = await Promise.allSettled([
+      // Weather (503 without an outlook) and the barrier scan (404 without one) are optional: shown when present.
+      const [risk, downstream, impacts, weather, barrier, ...layerRes] = await Promise.allSettled([
         api.risk(id),
         api.downstream(id),
         api.impacts(id),
+        api.lakeWeather(id),
+        api.barrier(id),
         ...LAYER_NAMES.map((n) => api.layer(id, n)),
       ]);
       const layers: LakeLayers = {};
@@ -43,6 +46,8 @@ function loadLake(id: string): Promise<Loaded> {
           risk: risk.status === "fulfilled" ? (risk.value as LakeDetail["risk"]) : null,
           downstream: downstream.status === "fulfilled" ? (downstream.value as LakeDetail["downstream"]) : null,
           impacts: impacts.status === "fulfilled" ? (impacts.value as Impact[]) : null,
+          weather: weather.status === "fulfilled" ? (weather.value as LakeDetail["weather"]) : null,
+          barrier: barrier.status === "fulfilled" ? (barrier.value as LakeDetail["barrier"]) : null,
           errors: {
             risk: errText(risk),
             downstream: errText(downstream),
@@ -78,6 +83,15 @@ export function App() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(false);
   const ctrl = useRef<MapController | null>(null);
+  const [weather, setWeather] = useState<Map<string, WeatherBrief>>(new Map());
+
+  // Weather trigger levels for the lake list: optional, so a failure shows nothing.
+  useEffect(() => {
+    api
+      .weather()
+      .then((rows) => setWeather(new Map((Array.isArray(rows) ? rows : []).map((w) => [w.lake_id, w]))))
+      .catch(() => {});
+  }, []);
 
   const fetchIndex = () => {
     setIndexErr(null);
@@ -129,7 +143,7 @@ export function App() {
         if (live)
           setLoaded({
             layers: {},
-            detail: { risk: null, downstream: null, impacts: null, errors: { risk: String(e), impacts: String(e) } },
+            detail: { risk: null, downstream: null, impacts: null, weather: null, barrier: null, errors: { risk: String(e), impacts: String(e) } },
           });
       })
       .finally(() => live && setLoading(false));
@@ -157,7 +171,7 @@ export function App() {
           </button>
         </div>
       ) : index ? (
-        <LakeList lakes={lakes} selectedId={selectedId} onSelect={select} />
+        <LakeList lakes={lakes} selectedId={selectedId} onSelect={select} weather={weather} />
       ) : (
         <div class="sidebar">
           <Loading what="lakes" />
@@ -192,6 +206,7 @@ export function App() {
             ctrl.current?.fitAll(lakes);
           }}
           onFocusImpact={(im) => ctrl.current?.focusImpact(im)}
+          onFocusPoint={(lon, lat) => ctrl.current?.focusPoint(lon, lat)}
         />
       )}
       <Footer apiBase={api.base} />

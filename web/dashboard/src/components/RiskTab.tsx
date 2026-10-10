@@ -1,7 +1,85 @@
-import { dateOnly, discharge, factorValue, km2, LEVEL_LABEL, num, volume } from "../format";
-import type { Factor, RiskFile } from "../types";
+import { dateOnly, dateTime, discharge, factorValue, km2, LEVEL_LABEL, num, volume } from "../format";
+import type { Factor, RiskFile, WeatherOutlook } from "../types";
 import { ReplayChart } from "./charts";
-import { LevelBadge, ScoreBar, Section, SourceText } from "./ui";
+import { LevelBadge, ScoreBar, Section, SourceText, WeatherBadge } from "./ui";
+
+/** "08 Oct" from an ISO day. */
+function shortDay(iso: string): string {
+  const t = new Date(iso + "T00:00:00Z");
+  if (Number.isNaN(t.getTime())) return iso;
+  return t.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "UTC" });
+}
+
+/** Short-term context next to the seasonal score: the Open-Meteo outlook and the trigger it sets. */
+function WeatherOutlookSection({ w }: { w: WeatherOutlook }) {
+  const days = Array.isArray(w.days) ? w.days : [];
+  const reasons = w.trigger?.reasons ?? [];
+  return (
+    <Section
+      title="Weather outlook (next 3 days)"
+      aside={
+        <span class="aside-row">
+          {w.stale && (
+            <span class="wx-stale" title="The latest fetch failed: this is the last outlook that was received">
+              stale
+            </span>
+          )}
+          {w.trigger?.level && <WeatherBadge level={w.trigger.level} />}
+        </span>
+      }
+    >
+      {reasons.length > 0 ? (
+        <ul class="wx-reasons">
+          {reasons.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      ) : (
+        <p class="muted">No weather trigger in the forecast.</p>
+      )}
+      {days.length > 0 && (
+        <table class="table compact weather">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="num">Rain mm</th>
+              <th class="num">Snow cm</th>
+              <th class="num" title="Daily maximum / minimum air temperature">
+                Tmax / Tmin °C
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d.date} class={d.forecast ? undefined : "row-dim"}>
+                <td>
+                  {shortDay(d.date)}
+                  {!d.forecast && <span class="small"> · past</span>}
+                </td>
+                <td class="num">{num(d.precipitation_mm, 1)}</td>
+                <td class="num">{num(d.snowfall_cm, 1)}</td>
+                <td class="num">
+                  {num(d.tmax_c, 1)} / {num(d.tmin_c, 1)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p class="caption">
+        Source: <SourceText text={w.source || "Open-Meteo"} />
+        {w.fetched_at ? ` · fetched ${dateTime(w.fetched_at)}` : ""}
+        {w.stale ? " · stale" : ""}
+      </p>
+      {w.trigger?.rule && (
+        <details class="more">
+          <summary>Rule</summary>
+          <p>{w.trigger.rule}</p>
+        </details>
+      )}
+    </Section>
+  );
+}
 
 const GROUP_TITLE: Record<string, string> = {
   size: "Size · how big a flood could be",
@@ -52,7 +130,7 @@ function FactorRow({ f }: { f: Factor }) {
   );
 }
 
-export function RiskTab({ risk }: { risk: RiskFile }) {
+export function RiskTab({ risk, weather }: { risk: RiskFile; weather?: WeatherOutlook | null }) {
   const r = risk.latest;
   const groups = ["size", "likelihood"].concat(
     [...new Set(r.factors.map((f) => f.group))].filter((g) => g !== "size" && g !== "likelihood"),
@@ -102,6 +180,8 @@ export function RiskTab({ risk }: { risk: RiskFile }) {
           </dl>
         </details>
       </div>
+
+      {weather && <WeatherOutlookSection w={weather} />}
 
       {groups.map((g) => {
         const fs = r.factors.filter((f) => f.group === g);
