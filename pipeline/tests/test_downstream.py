@@ -263,7 +263,8 @@ def test_assets_lower_than_the_flood_but_outside_the_corridor_are_not_flooded():
         ],
     )
     by = {i.name: i for i in out}
-    assert by["village behind the ridge"].height_above_flood_m < 0  # lower than the water, and within 2 km
+    # lower than the water and within 2 km, but not reached: the level does not apply, so no height
+    assert by["village behind the ridge"].height_above_flood_m is None
     assert by["village behind the ridge"].status == "outside"
     assert by["footbridge behind the ridge"].status == "outside"
     assert by["village on the river"].status == "flooded"

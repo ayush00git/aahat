@@ -246,6 +246,16 @@ def discharge_at(km: float, peak_m3s: float, attenuation_km: float) -> float:
     return peak_m3s * math.exp(-km / attenuation_km)
 
 
+def level_along(stations: list[Station], chain_m) -> np.ndarray:
+    """Flood level (m) at distance `chain_m` along the path, interpolated between stations.
+
+    The one definition of "the flood level here": the corridor compares each cell with it, and
+    impact.assess compares each asset's ground with it, so the two cannot disagree.
+    """
+    st_chain = np.array([st.km for st in stations], float) * 1000
+    return np.interp(chain_m, st_chain, np.array([st.wse_m for st in stations], float))
+
+
 def _tangents(sxy: np.ndarray) -> np.ndarray:
     """Unit direction of travel at each station, over +/- 2 stations."""
     out = np.empty_like(sxy, dtype=float)
@@ -349,9 +359,8 @@ def corridor(
     if path_xy is not None and n > 1:
         # points every cell along the path, each with an interpolated level and its nearest station's reach
         chain, pxy = _resample(np.asarray(path_xy, float), grid.res)
-        st_chain = np.array([st.km for st in stations], float) * 1000
         owner = np.clip(np.rint(chain / max(p.station_m, 1e-9)).astype(int), 0, n - 1)
-        wse_pt = np.interp(chain, st_chain, st_wse)
+        wse_pt = level_along(stations, chain)
     else:
         pxy, owner, wse_pt = np.asarray(sxy, float), np.arange(n), st_wse
     path_mask = np.zeros(grid.shape, bool)

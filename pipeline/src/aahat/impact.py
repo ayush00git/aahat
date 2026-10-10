@@ -1,8 +1,8 @@
 """Which settlements, bridges, roads and hydro projects a lake's flood could reach, and when.
 
 Each OpenStreetMap asset is placed on the flood path: its distance downstream (projection onto
-the path), its ground height relative to the screening flood level at that point, and whether it
-lies in the inundation corridor. Results are ordered by arrival time, nearest first: the order in
+the path), its ground height relative to the screening flood level at that point, and whether the
+flood in the inundation corridor reaches ground that low (one flood level, see assess). Results are ordered by arrival time, nearest first: the order in
 which alerts fan out. All of it inherits the screening caveats of downstream.py, and OSM coverage
 in the Himalaya is uneven, so a place missing from OSM is missing here.
 """
@@ -10,14 +10,16 @@ in the Himalaya is uneven, so a place missing from OSM is missing here.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import asdict, dataclass
 
 import numpy as np
+import shapely
 from pyproj import CRS
 from shapely.geometry import LineString
 from shapely.prepared import prep
 
-from .downstream import Downstream, sample
+from .downstream import Downstream, level_along, sample
 from .exposure import Asset, fetch_assets
 from .geo import from_wgs84
 
@@ -40,7 +42,9 @@ class Impact:
     lat: float
     km: float  # along the flood path from the lake's spill point
     lateral_m: float  # from the path (river) line
-    height_above_flood_m: float | None  # ground minus screening flood level; negative = under water
+    # ground minus the flood level there (see assess): negative exactly when status is "flooded";
+    # None where the ground is lower than the flood level but the flood does not reach it
+    height_above_flood_m: float | None
     flood_depth_m: float  # at the nearest station, above the river bed
     arrival_min_expected: float
     arrival_min_fast: float
@@ -49,13 +53,36 @@ class Impact:
 
 
 def assess(d: Downstream, assets: list[Asset], max_lateral_m: float = 3000.0) -> list[Impact]:
+    """Each asset's outcome in one scenario.
+
+    One flood level applies at any point: the level interpolated between stations at the nearest
+    point of the path (downstream.level_along, the level the corridor was drawn with). Status and
+    height_above_flood_m both come from it, so they cannot contradict each other:
+
+    - flooded: some part of the asset lies in the corridor (a point: within half a DEM cell of it)
+      AND the ground there is below the flood level. height_above_flood_m is negative: the lowest
+      such ground minus the level there.
+    - margin (not roads): not flooded, within MARGIN_DISTANCE_M of the corridor and no more than
+      MARGIN_HEIGHT_M above the flood level (which includes low ground the flood does not reach).
+    - outside: everything else.
+
+    For an asset that is not flooded, height_above_flood_m is zero or positive, or None where its
+    ground is lower than the flood level but the connected flood does not reach it (behind a ridge,
+    beyond the wetted reach): the level was solved for the channel and means nothing there.
+    """
     crs = CRS.from_user_input(d.crs)
     path = LineString(d.path_xy)
     corridor = from_wgs84(d.corridor, crs)
     near_corridor = prep(corridor.buffer(MARGIN_DISTANCE_M))
-    inside = prep(corridor)
-    station_km = np.array([s.km for s in d.stations])
-    edge_m = d.grid.res / 2 if d.grid is not None else 15.0
+    station_m = np.array([s.km for s in d.stations]) * 1000
+    res = d.grid.res if d.grid is not None else 30.0
+
+    def heights(xy: np.ndarray) -> np.ndarray:
+        """Ground minus the flood level at each point, to 0.1 m (NaN off the DEM)."""
+        z = sample(d.dem, d.grid, xy[:, 0], xy[:, 1])
+        along = shapely.line_locate_point(path, shapely.points(xy))
+        return np.round(z - level_along(d.stations, along), 1)
+
     out: list[Impact] = []
     for a in assets:
         g = from_wgs84(a.geometry, crs)
@@ -63,33 +90,43 @@ def assess(d: Downstream, assets: list[Asset], max_lateral_m: float = 3000.0) ->
             continue
         # where the asset meets the flood first: its point nearest the river
         ref = g if g.geom_type == "Point" else _nearest_point(g, path)
-        km = path.project(ref) / 1000
-        if km > station_km[-1] + 0.5:
+        along_m = path.project(ref)
+        km = along_m / 1000
+        if km > station_m[-1] / 1000 + 0.5:
             continue
-        # the flood level that applies here is the nearest station's, as for the corridor itself (on a
-        # bend the station at the projected km can be a different reach)
+        # depth in the river and arrival come from the nearest station (unchanged); the flood level
+        # the asset's ground is compared with does not: see heights()
         if d.station_xy is not None:
             i = int(np.argmin(np.hypot(d.station_xy[:, 0] - ref.x, d.station_xy[:, 1] - ref.y)))
         else:
-            i = int(np.clip(np.searchsorted(station_km, km), 0, len(station_km) - 1))
+            i = int(np.argmin(np.abs(station_m - along_m)))
         st = d.stations[i]
-        z = float(sample(d.dem, d.grid, np.array([ref.x]), np.array([ref.y]))[0])
-        height = None if not np.isfinite(z) else round(z - st.wse_m, 1)
-        # Flooded means reached by the connected flood (the corridor), not merely lower than the flood
-        # level somewhere within corridor_m of the river: ground behind a ridge, or on the far side of
-        # the plateau a lake sits on, is lower than the water and still dry.
-        # A settlement or school is one OSM point: flooded if it is in the corridor (to within half a
-        # DEM cell), whose cells are all below the flood level interpolated along the river. Lines and
-        # areas (bridges, roads, plants) count as flooded where they enter the corridor.
-        flooded = corridor.distance(g) <= edge_m if g.geom_type == "Point" else inside.intersects(g)
+        # The part of the asset the connected flood can reach. A settlement or school is one OSM
+        # point, taken as reached within half a DEM cell of the corridor; lines and areas (bridges,
+        # roads, plants) where they enter it. Ground merely lower than the flood level, behind a
+        # ridge or on the far side of the plateau a lake sits on, is not reached.
+        if g.geom_type == "Point":
+            reached = g if corridor.distance(g) <= res / 2 else None
+        else:
+            reached = g.intersection(corridor)
+        h_in = (
+            heights(_sample_points(reached, res / 2)) if reached is not None and not reached.is_empty else np.array([])
+        )
+        h_in = h_in[np.isfinite(h_in)]
+        if h_in.size:
+            raw = float(h_in.min())  # the lowest ground the flood can reach
+        else:
+            h_ref = float(heights(np.array([[ref.x, ref.y]]))[0])
+            raw = h_ref if np.isfinite(h_ref) else None
+        flooded = bool(h_in.size) and raw < 0
         if flooded:
             status = "flooded"
-        elif (
-            a.kind not in ("road",) and near_corridor.intersects(g) and height is not None and height <= MARGIN_HEIGHT_M
-        ):
+        elif a.kind != "road" and near_corridor.intersects(g) and raw is not None and raw <= MARGIN_HEIGHT_M:
             status = "margin"
         else:
             status = "outside"
+        # lower than the flood level but not reached by it: the level does not apply, no height
+        height = None if raw is None or (raw < 0 and not flooded) else raw + 0.0  # + 0.0: no "-0.0"
         lonlat = _lonlat(ref, crs)
         out.append(
             Impact(
@@ -112,6 +149,28 @@ def assess(d: Downstream, assets: list[Asset], max_lateral_m: float = 3000.0) ->
         )
     out.sort(key=lambda r: r.km)  # arrival order: nearest first, the order alerts fan out in
     return out
+
+
+def _sample_points(geom, step: float) -> np.ndarray:
+    """Points on `geom` at most `step` apart: a point itself, along lines, around and inside areas."""
+    pts: list[tuple[float, float]] = []
+    for part in getattr(geom, "geoms", [geom]):
+        if part.is_empty:
+            continue
+        if part.geom_type == "Point":
+            pts.append((part.x, part.y))
+            continue
+        if part.geom_type == "Polygon":
+            inner = part.representative_point()
+            pts.append((inner.x, inner.y))
+            part = part.boundary
+        if part.geom_type in ("LineString", "LinearRing", "MultiLineString"):
+            for line in getattr(part, "geoms", [part]):
+                n = max(1, math.ceil(line.length / step))
+                pts += [line.interpolate(k / n, normalized=True).coords[0][:2] for k in range(n + 1)]
+        else:  # a collection within a collection
+            pts += map(tuple, _sample_points(part, step))
+    return np.array(pts, float).reshape(-1, 2)
 
 
 def _nearest_point(g, path):
@@ -160,8 +219,9 @@ def fetch_along(d: Downstream, pad_deg: float = 0.03, chunk_km: float = 20.0) ->
 
 def merge_scenarios(per_scenario: dict[str, list[Impact]]) -> list[dict]:
     """One row per asset with each scenario's outcome and a summary status:
-    in_flood_path (flooded in the expected scenario), at_risk (flooded only in the severe one, or on
-    the margin in either), outside. Arrival times do not depend on the scenario."""
+    in_flood_path (flooded in the expected scenario, whatever the severe one says), at_risk (not that,
+    but flooded in the severe scenario or on the margin in either), outside (outside in both).
+    Arrival times do not depend on the scenario."""
     rows: dict[str, dict] = {}
     for name, impacts in per_scenario.items():
         for i in impacts:
@@ -196,7 +256,6 @@ def run_downstream(lake_dir) -> dict:
     (per-scenario stations and discharge, caveats), flood_path.geojson, corridor_<scenario>.geojson, impacts.json."""
     import json
 
-    import shapely
     from shapely.geometry import mapping, shape
 
     from .downstream import compute_scenarios, path_geojson

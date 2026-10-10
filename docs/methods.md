@@ -134,9 +134,17 @@ for each scenario), `flood_path.geojson`, `corridor_expected.geojson`, `corridor
 6. **Arrival:** distance ÷ flood-front speed, 10 m/s (fast) to 8 m/s (expected); South Lhonak 2023 averaged
    about 8 m/s over 67.5 km.
 7. **Exposure:** OpenStreetMap (Geofabrik northern-India extract, Overpass outside it). An asset is
-   *in flood path* if it is flooded in the expected scenario, *at risk* if only in the severe one or within
-   10 m above the flood level near the corridor. Flooded means inside the corridor: a place lower than the
-   flood level but not reached by the connected flood (behind a ridge) is not counted.
+   *in flood path* if it is flooded in the expected scenario, *at risk* if it is flooded only in the severe
+   one or on the margin in either, otherwise *outside*. Per scenario, one flood level applies at an asset:
+   the level interpolated between stations at the nearest point of the path, the same one the corridor is
+   drawn with. An asset is *flooded* if part of it lies in the corridor (a village or school is one point:
+   within half a DEM cell, 15 m) and the ground there is below that level; on the *margin* if it is not
+   flooded, within 300 m of the corridor and no more than 10 m above the level (roads are never margin);
+   else *outside*. `height_above_flood_m` is ground minus that level, taken at the lowest ground the flood
+   reaches on the asset, else at its point nearest the river: negative exactly when the asset is flooded.
+   It is null where the ground is lower than the flood level but the connected flood does not reach it
+   (behind a ridge, beyond the wetted reach): the level means nothing there. `flood_depth_m` is the depth
+   in the river at the nearest station, not at the asset.
 
 ## Check against NRSC's HEC-RAS modelling
 

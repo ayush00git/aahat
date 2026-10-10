@@ -202,7 +202,9 @@ It is a screening score for deciding where to look, not a probability that a lak
 6. **Arrival:** distance ÷ flood-front speed, 10 m/s (fast) to 8 m/s (expected); South Lhonak 2023 averaged
    about 8 m/s over 67.5 km.
 7. **Exposure:** OpenStreetMap. An asset is *in flood path* if it is flooded in the expected scenario,
-   *at risk* if only in the severe one or within 10 m above the flood level near the corridor.
+   *at risk* if only in the severe one or within 10 m above the flood level near the corridor (300 m).
+   Flooded means in the corridor with ground below the flood level there, so a flooded place always
+   has a negative height above the flood, and no other place does.
 
 **Check against NRSC's HEC-RAS modelling** (Gepang Gath, Samudra Tapu reports on Bhuvan): NRSC's peak discharge
 falls between our two scenarios at every benchmark site. Its flood depth does so at three of the five: at Sissu

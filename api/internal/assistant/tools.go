@@ -37,15 +37,16 @@ var askTools = []Tool{
 			"(known), whether it is outside every flood path (safe), and for each threatening lake the risk level, " +
 			"distance along the river (km) and minutes until the water could arrive (minutes_to_say is the figure to quote). " +
 			"if_lake_bursts gives, for the expected flood and for the larger severe flood: " +
-			"status (flooded = the flood reaches the village's mapped point; margin = the flood passes within 300 m and " +
+			"status (flooded = the flood reaches the village's mapped point and its ground is below the flood level; margin = the flood passes within 300 m and " +
 			"the ground is less than 10 m above it, so houses near the river may be reached; outside = not reached); " +
 			"river_water_depth_m = how deep the flood water would be in the river beside the village, measured from the " +
 			"river bed (it is the depth in the river channel, NOT the depth of water in the village); " +
 			"village_ground (below_flood_level, above_flood_level or at_flood_level) with village_ground_m = how many " +
 			"metres the ground at the village's mapped point is below or above the level the flood water would reach. " +
 			"Say it like: \"the river water would be about 6.2 m deep; the village ground is 1.2 m below the flood " +
-			"level\". Only status says whether the village is reached: ground below the flood level with status margin " +
-			"or outside lies behind higher ground. A missing value means it is not available.",
+			"level\". Only status says whether the village is reached. With status margin or outside the ground is above " +
+			"the flood level, so never say the flood reaches the village; say houses near the river may be reached " +
+			"(margin) or that it is not reached (outside). A missing value means it is not available.",
 		Schema: objectSchema("osm", "OSM id of the place, like node/123456"),
 	},
 	{
