@@ -1,13 +1,15 @@
 import { useI18n, type Lang } from '../i18n';
 import { href } from '../router';
+import { setTheme, useTheme } from '../theme';
+import { IconMoon, IconSun } from './icons';
 
 /** The app mark (same as the officials' dashboard): a peak above a glacial lake. */
 export function Mark({ size = 28 }: { size?: number }) {
   return (
     <svg class="mark" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <rect width="32" height="32" rx="7" fill="#15263d" />
-      <path d="M5 21.5 12.5 9l4 6.2 2.7-3.7 7.8 10Z" fill="#e6edf6" />
-      <path d="M8 25.5q8-3.4 16 0" fill="none" stroke="#5cc4cf" stroke-width="2.4" stroke-linecap="round" />
+      <rect class="mark-bg" width="32" height="32" rx="7" />
+      <path class="mark-peak" d="M5 21.5 12.5 9l4 6.2 2.7-3.7 7.8 10Z" />
+      <path class="mark-wave" d="M8 25.5q8-3.4 16 0" stroke-width="2.4" stroke-linecap="round" />
     </svg>
   );
 }
@@ -28,11 +30,25 @@ export function Header() {
       <p class="header-tag">{t.tagline}</p>
       <div class="header-actions">
         <LangToggle />
+        <ThemeToggle />
         <a class="officials" href="/officials/" title={t.officialsLabel} aria-label={t.officialsLabel}>
           {t.officials}
         </a>
       </div>
     </header>
+  );
+}
+
+/** Shows where a tap leads: the moon in the light theme, the sun in the dark one. */
+function ThemeToggle() {
+  const { t } = useI18n();
+  const theme = useTheme();
+  const next = theme === 'dark' ? 'light' : 'dark';
+  const label = next === 'dark' ? t.themeToDark : t.themeToLight;
+  return (
+    <button type="button" class="theme-btn" title={label} aria-label={label} onClick={() => setTheme(next)}>
+      {next === 'dark' ? <IconMoon size={20} /> : <IconSun size={20} />}
+    </button>
   );
 }
 

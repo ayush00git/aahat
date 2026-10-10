@@ -16,6 +16,8 @@ const hi = {
   tagline: 'हिमनद झील बाढ़ चेतावनी',
   heroLine: 'हिमनद झील बाढ़ की पहले से चेतावनी',
   langSwitch: 'भाषा',
+  themeToDark: 'गहरा रंग चुनें',
+  themeToLight: 'हल्का रंग चुनें',
   homeLabel: 'आहट — मुख्य पन्ना',
 
   searchLabel: 'अपना गाँव खोजें',
@@ -202,6 +204,8 @@ const en: Strings = {
   tagline: 'Glacial lake flood warning',
   heroLine: 'Early warning for glacial lake floods',
   langSwitch: 'Language',
+  themeToDark: 'Switch to dark theme',
+  themeToLight: 'Switch to light theme',
   homeLabel: 'Aahat home',
 
   searchLabel: 'Find your village',

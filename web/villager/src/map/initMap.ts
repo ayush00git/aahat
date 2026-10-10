@@ -17,6 +17,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { layerURL, type RiskLevel } from '../api';
 import { greatCircleKm } from '../nearest';
+import { cssVar } from '../theme';
 
 setWorkerUrl(workerUrl);
 
@@ -68,25 +69,23 @@ export interface MapHandle {
   setLakes(lakes: MapLake[], labels: MapLabels): void;
   setView(view: MapView): void;
   setBasemap(b: Basemap): void;
+  /** The theme changed: re-read the colours that come from CSS. */
+  setTheme(): void;
   destroy(): void;
 }
 
-export const LEVEL_COLOR: Record<RiskLevel, string> = {
-  low: '#3fb950',
-  moderate: '#e3b341',
-  high: '#f0883e',
-  very_high: '#f85149',
-};
-const UNSCORED = '#8193a9';
+// Colours live in styles.css (custom properties) so the themes stay in one
+// place; the literals here are only fallbacks. Lake dots take theirs from the
+// .dot-<level> classes.
+const colors = () => ({
+  mapBg: cssVar('--map-bg', '#0a1320'),
+  corridorSevere: cssVar('--map-severe', '#f2a0a0'),
+  corridorExpected: cssVar('--map-expected', '#c0392b'),
+  floodPath: cssVar('--map-path', '#203a5c'),
+  floodPathSat: cssVar('--map-path-sat', '#7fd3ff'),
+});
 
-const COLORS = {
-  corridorSevere: '#f2a0a0',
-  corridorExpected: '#c0392b',
-  floodPath: '#203a5c',
-  floodPathSat: '#7fd3ff',
-};
-
-const STYLE: StyleSpecification = {
+const style = (bg: string): StyleSpecification => ({
   version: 8,
   sources: {
     osm: {
@@ -106,7 +105,7 @@ const STYLE: StyleSpecification = {
     },
   },
   layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#0a1320' } },
+    { id: 'bg', type: 'background', paint: { 'background-color': bg } },
     {
       id: 'basemap-osm',
       type: 'raster',
@@ -122,7 +121,7 @@ const STYLE: StyleSpecification = {
       paint: { 'raster-saturation': -0.2, 'raster-brightness-max': 0.9 },
     },
   ],
-};
+});
 
 type FC = FeatureCollection | Feature;
 
@@ -150,10 +149,11 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 
 export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
   let map: MLMap;
+  let COLORS = colors();
   try {
     map = new MLMap({
       container,
-      style: STYLE,
+      style: style(COLORS.mapBg),
       bounds: HOME_BOUNDS,
       fitBoundsOptions: { padding: 24 },
       maxZoom: 16,
@@ -170,7 +170,7 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
     });
   } catch {
     opts.onError(); // no WebGL
-    return { setLakes() {}, setView() {}, setBasemap() {}, destroy() {} };
+    return { setLakes() {}, setView() {}, setBasemap() {}, setTheme() {}, destroy() {} };
   }
   map.touchZoomRotate.disableRotation();
   map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -301,8 +301,7 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
       node.type = 'button';
       node.title = l.name;
       node.setAttribute('aria-label', l.level && labels ? `${l.name} — ${labels.risk(l.level)}` : l.name);
-      const dot = el('span', 'lake-pin-dot');
-      dot.style.background = l.level ? LEVEL_COLOR[l.level] : UNSCORED;
+      const dot = el('span', `lake-pin-dot dot-${l.level ?? 'unscored'}`);
       node.append(dot, el('span', 'lake-pin-label', l.name));
       node.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -402,6 +401,14 @@ export function createMap(container: HTMLElement, opts: MapOptions): MapHandle {
     setBasemap(b) {
       basemap = b;
       loaded.then(() => !dead && applyBasemap());
+    },
+    setTheme() {
+      COLORS = colors();
+      loaded.then(() => {
+        if (dead) return;
+        map.setPaintProperty('bg', 'background-color', COLORS.mapBg);
+        applyBasemap();
+      });
     },
     destroy() {
       dead = true;

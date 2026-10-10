@@ -5,6 +5,7 @@ import { num } from '../format';
 import { load, save } from '../storage';
 import { nearestLakes } from '../nearest';
 import { useLakes, useSelection } from '../mapStore';
+import { useTheme } from '../theme';
 import type { Basemap, MapHandle, MapLake, MapView } from '../map/initMap';
 import { IconMap } from './icons';
 
@@ -38,6 +39,7 @@ export function MapPanel() {
   const { t, lang } = useI18n();
   const sel = useSelection();
   const lakes = useLakes();
+  const theme = useTheme();
   const box = useRef<HTMLDivElement>(null);
   const handle = useRef<MapHandle | null>(null);
   const [status, setStatus] = useState<Status>(() => (slowConnection() ? 'held' : 'loading'));
@@ -137,6 +139,12 @@ export function MapPanel() {
     if (status !== 'ready') return;
     handle.current?.setBasemap(basemap);
   }, [status, basemap]);
+
+  // Map overlays follow the theme through CSS; the canvas colours are re-read.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    handle.current?.setTheme();
+  }, [status, theme]);
 
   const pick = (b: Basemap) => {
     save('basemap', b);
