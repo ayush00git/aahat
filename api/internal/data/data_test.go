@@ -93,3 +93,33 @@ func TestAffectedUnder(t *testing.T) {
 		}
 	}
 }
+
+type stubStore struct {
+	body []byte
+	err  error
+	gets int
+}
+
+func (s *stubStore) Get(context.Context, string) ([]byte, error) {
+	s.gets++
+	return s.body, s.err
+}
+
+func TestFallback(t *testing.T) {
+	ctx := context.Background()
+	local := &stubStore{body: []byte("local")}
+
+	ok := &stubStore{body: []byte("s3")}
+	if b, err := NewFallback(ok, local, nil).Get(ctx, "k"); err != nil || string(b) != "s3" || local.gets != 0 {
+		t.Fatalf("healthy primary: %q, %v, local reads %d", b, err, local.gets)
+	}
+	// A key missing from the primary is missing: the local copy must not resurrect a deleted file.
+	missing := &stubStore{err: ErrNotFound}
+	if _, err := NewFallback(missing, local, nil).Get(ctx, "k"); !errors.Is(err, ErrNotFound) || local.gets != 0 {
+		t.Fatalf("missing key: %v, local reads %d", err, local.gets)
+	}
+	broken := &stubStore{err: errors.New("s3 unreachable")}
+	if b, err := NewFallback(broken, local, nil).Get(ctx, "k"); err != nil || string(b) != "local" {
+		t.Fatalf("broken primary: %q, %v", b, err)
+	}
+}

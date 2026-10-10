@@ -170,6 +170,17 @@ take minutes per lake. Results are copied to the project's S3 bucket under `rese
 
 ## Where the data lives
 
-The API serves the pipeline's output files from the server's disk. The same files are backed up to
-a private, versioned S3 bucket after every refresh and once a day (`data/` for lake data, `state/`
-for subscriptions and the alert log). See [`infra/ec2/README.md`](infra/ec2/README.md).
+The pipeline writes its output files on the server and syncs them to an S3 bucket after every refresh
+(every 2 days) and once a day. The API serves them from S3 (prefix `data/`, cached for 10 minutes) and
+falls back to the server's own copy if S3 cannot be reached.
+
+The same files are open data, public to read without an account:
+
+```bash
+curl https://aahat-data-001018341972.s3.ap-south-1.amazonaws.com/data/lakes/index.json
+curl https://aahat-data-001018341972.s3.ap-south-1.amazonaws.com/data/README.txt          # layout, sources and terms
+aws s3 ls --no-sign-request s3://aahat-data-001018341972/data/lakes/gepang-gath/
+```
+
+Subscriptions and the alert log (`state/`) are backed up in the same bucket and are private.
+See [`infra/ec2/README.md`](infra/ec2/README.md).

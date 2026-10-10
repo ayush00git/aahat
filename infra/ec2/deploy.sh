@@ -41,6 +41,9 @@ for app in ${AAHAT_WEB_APPS:-villager dashboard}; do
   [ -d /tmp/aahat/web-$app ] && sudo rsync -a --delete /tmp/aahat/web-$app/ /srv/aahat/web/$app/
 done
 printf 'AWS_REGION=%s\nAAHAT_POLLY=1\nAAHAT_SMS=%s\n' "$AWS_REGION" "$AAHAT_SMS" | sudo tee /srv/aahat/api.env >/dev/null
+# Serve the copy published to S3 (data-bucket.sh), with the disk copy as the API's fallback
+BUCKET=$(grep '^DATA_BUCKET=' /srv/aahat/ops.env 2>/dev/null | cut -d= -f2 || true)
+[ -n "$BUCKET" ] && printf 'AAHAT_DATA_BUCKET=%s\nAAHAT_DATA_PREFIX=data\n' "$BUCKET" | sudo tee -a /srv/aahat/api.env >/dev/null
 [ -f /srv/aahat/webhook.secret ] || openssl rand -hex 32 | sudo tee /srv/aahat/webhook.secret >/dev/null
 echo "AAHAT_WEBHOOK_SECRET=$(sudo cat /srv/aahat/webhook.secret)" | sudo tee -a /srv/aahat/api.env >/dev/null
 [ -f /srv/aahat/official.token ] || openssl rand -hex 16 | sudo tee /srv/aahat/official.token >/dev/null

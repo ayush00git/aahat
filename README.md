@@ -86,7 +86,7 @@ flowchart TD
 
   subgraph EC2["One EC2 instance, ap-south-1"]
     PIPE["Python pipeline<br/>systemd timer, every 2 days"]
-    DISK["JSON and GeoJSON files<br/>on the server disk"]
+    DISK["JSON and GeoJSON files<br/>written to the server disk"]
     API["Go API"]
     CADDY["Caddy, HTTPS"]
     WORK["Research worker<br/>one job at a time"]
@@ -97,7 +97,7 @@ flowchart TD
     DASH["Officials dashboard"]
   end
 
-  S3["Amazon S3<br/>private, versioned backup"]
+  S3["Amazon S3<br/>published data, public to read"]
   POLLY["Amazon Polly<br/>Hindi voice"]
   SNS["Amazon SNS<br/>SMS and ops email"]
   PUSH["Web push, VAPID"]
@@ -108,12 +108,13 @@ flowchart TD
   RGI --> PIPE
   OSM --> PIPE
   PIPE --> DISK
-  DISK --> API
+  DISK -- "sync after each refresh" --> S3
+  S3 --> API
+  DISK -. "fallback" .-> API
   OM --> API
   API --> CADDY
   CADDY --> VILL
   CADDY --> DASH
-  DISK -. "after each refresh and daily" .-> S3
   API -. "spoken warnings" .-> POLLY
   API -. "SMS" .-> SNS
   API -. "notifications" .-> PUSH
@@ -129,11 +130,15 @@ The pipeline, the API, both web apps and the research worker run on one `t4g.sma
 
 - A systemd timer runs the pipeline every 2 days ([`refresh.sh`](infra/ec2/refresh.sh)): new scenes for the
   current season, then risk, downstream, the index, the place list, the barrier scans and the drain checks.
-- The Go API serves those files from the server's disk and listens on localhost; Caddy terminates HTTPS and
-  serves the two static web apps.
-- The same files, plus the subscriptions and alert log, are copied to a private, versioned S3 bucket after
-  every refresh and once a day. S3 is the backup, not what the API serves from. The API has a code path to read
-  from S3 instead; it is not used on the live server.
+- When a refresh finishes, the files are synced to an S3 bucket (and once a day besides). So new Sentinel-2
+  scenes, which arrive on AWS Open Data about every 5 days per lake, flow as: Open Data → pipeline on EC2 → S3.
+- The Go API serves the data from S3 (prefix `data/`, cached in memory for 10 minutes) and falls back to the
+  copy on the server's disk if S3 cannot be reached. It listens on localhost; Caddy terminates HTTPS and serves
+  the two static web apps.
+- The `data/` prefix is public to read, as open data: start at
+  [`data/lakes/index.json`](https://aahat-data-001018341972.s3.ap-south-1.amazonaws.com/data/lakes/index.json) and
+  [`data/README.txt`](https://aahat-data-001018341972.s3.ap-south-1.amazonaws.com/data/README.txt) (layout, sources, terms). The subscriptions and alert log (`state/`) and
+  researcher results (`research/`) are in the same bucket and stay private. The bucket is versioned.
 - The API writes a researcher job as a file; a systemd path unit starts the worker, which runs the pipeline
   for that lake and copies the results to S3 under `research/<job_id>/`.
 - A failed unit (API, refresh or backup) emails its last 30 journal lines through an SNS topic.
@@ -142,7 +147,7 @@ The pipeline, the API, both web apps and the research worker run on one `t4g.sma
 |---|---|
 | Registry of Open Data on AWS | Sentinel-2 L2A COGs (found through Earth Search STAC, read with HTTP range requests) and the Copernicus DEM GLO-30 |
 | Amazon EC2 | One `t4g.small` (2 vCPU ARM, 2 GB) running the pipeline, API, web apps and research worker, with an Elastic IP |
-| Amazon S3 | Private, versioned bucket: backup of served data (`data/`) and API state (`state/`), and researcher job results (`research/`) |
+| Amazon S3 | Versioned bucket: the published data the API serves (`data/`, public to read), and privately the API state backup (`state/`) and researcher job results (`research/`) |
 | Amazon Polly | Hindi and Indian-English speech (voice Kajal, neural) for alerts and assistant answers, played in the app |
 | Amazon SNS | SMS alerts (sandbox: verified numbers only) and the ops topic that emails unit failures |
 | AWS IAM | An instance role, so the server calls Polly, SNS and S3 with no stored keys |
@@ -339,7 +344,6 @@ The dashboard's map also offers Esri World Imagery as a base layer.
 
 - A statewide lake inventory. `aahat sweep` already finds large high-altitude lakes in fixed windows; nine of
   the catalogue's lakes came from it.
-- Publishing the `data/` prefix of the S3 bucket as open data.
 - SMS sender registration (DLT) for India, and voice calls.
 - In-situ sensors. The signed webhook `POST /webhook/sensor` already exists; no sensor is connected to it.
 

@@ -9,7 +9,7 @@ cd infra/ec2
 AAHAT_SMS=sns ./deploy.sh      # same, with SMS through Amazon SNS turned on
 ./deploy-pipeline.sh           # ship the pipeline + refresh timer (runs on the server every 2 days)
 AAHAT_OPS_EMAIL=you@example.com ./ops-alerts.sh   # failure emails (SNS topic + OnFailure= hook)
-./data-bucket.sh               # private S3 bucket for data + state, synced after each refresh and daily
+./data-bucket.sh               # S3 bucket for data (public to read) + state (private), synced after each refresh and daily
 ./teardown.sh                  # delete it all (asks separately before deleting the data bucket)
 ```
 
@@ -51,8 +51,8 @@ instance role (AWS CLI v2 ships with Amazon Linux 2023); no mail password anywhe
 
 ## Data bucket
 
-`data-bucket.sh` creates `aahat-data-<account id>` (private, public access blocked, SSE-S3, versioned, old
-versions expire after 30 days), lets the server's role read and write it (inline policy `data-bucket`), and
+`data-bucket.sh` creates `aahat-data-<account id>` (SSE-S3, versioned, old versions expire after 30 days;
+a bucket policy lets anyone read and list the `data/` prefix only, ACLs stay blocked), lets the server's role read and write it (inline policy `data-bucket`), and
 installs `/srv/aahat/bin/s3-sync.sh` with a daily timer (`aahat-s3-sync.timer`, 03:30 UTC). `refresh.sh`
 also runs the sync when it finishes. Names of the bucket and topic live in `/srv/aahat/ops.env` on the server.
 
@@ -72,7 +72,6 @@ also runs the sync when it finishes. Names of the bucket and topic live in `/srv
   ```
   An older copy of a file: `aws s3api list-object-versions --bucket $DATA_BUCKET --prefix state/store.json`,
   then `aws s3api get-object --version-id ...`.
-- The Go API can read the data straight from S3 instead of the local directory: set
-  `AAHAT_DATA_BUCKET=<bucket>` and `AAHAT_DATA_PREFIX=data` (the role already has read access). That is also
-  the path to open data later: publish only the `data/` prefix (a second public bucket or a CloudFront
-  origin limited to `data/*`), never `state/`.
+- The Go API serves the data from S3: `deploy.sh` writes `AAHAT_DATA_BUCKET` and `AAHAT_DATA_PREFIX=data` into
+  `api.env` when the bucket exists, and the API falls back to `/srv/aahat/data` if S3 cannot be reached.
+  `data/README.txt` (from `data-README.txt` here) carries the sources and terms for the public files.

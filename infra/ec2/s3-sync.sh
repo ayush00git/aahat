@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs ON the server as user aahat (end of refresh.sh, and aahat-s3-sync.timer daily): copy the served
-# data and the API's state to the private, versioned data bucket. Credentials come from the instance role.
+# data and the API's state to the versioned data bucket (data/ is public to read, state/ is private). Credentials come from the instance role.
 set -euo pipefail
 export HOME=/srv/aahat
 [ -f /srv/aahat/ops.env ] && . /srv/aahat/ops.env
@@ -14,6 +14,6 @@ if [ -f /srv/aahat/data/lakes/index.json ]; then
 else
   echo "no /srv/aahat/data/lakes/index.json: skipping data/ (restore it from the bucket instead)"
 fi
-# Subscriptions, the alert log and the web-push keys: private bucket only. Polly MP3s are regenerated.
+# Subscriptions, the alert log and the web-push keys: the state/ prefix, which the bucket policy keeps private. Polly MP3s are regenerated.
 aws s3 sync /srv/aahat/state "s3://$DATA_BUCKET/state" --only-show-errors --exclude "audio/*"
 echo "synced to s3://$DATA_BUCKET $(date -u +%FT%TZ)"

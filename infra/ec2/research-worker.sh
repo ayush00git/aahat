@@ -153,6 +153,7 @@ from aahat.risk import run_risk
 from aahat.timeseries import run_lake
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s", stream=sys.stdout)
+logging.getLogger("rasterio").setLevel(logging.WARNING)  # one line per file opened otherwise
 job_id, name, lat, lon, radius, y0, y1, out = sys.argv[1:]
 out = Path(out)
 lake = Lake(id=job_id, name=name, name_hi=name, lat=float(lat), lon=float(lon), aoi_radius_m=float(radius),

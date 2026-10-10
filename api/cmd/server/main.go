@@ -15,6 +15,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+
 	"github.com/ayush00git/aahat/api/internal/app"
 	"github.com/ayush00git/aahat/api/internal/data"
 	"github.com/ayush00git/aahat/api/internal/store"
@@ -52,8 +55,22 @@ func run(log *slog.Logger, addr, dataDir, storeFile string, cacheTTL time.Durati
 	if err != nil {
 		return err
 	}
+	// With AAHAT_DATA_BUCKET the API serves the copy the pipeline publishes to S3 (prefix
+	// AAHAT_DATA_PREFIX), with the directory on disk behind it in case S3 cannot be reached.
+	var files data.DataStore = local
+	if bucket := os.Getenv("AAHAT_DATA_BUCKET"); bucket != "" {
+		awsCfg, err := config.LoadDefaultConfig(context.Background())
+		if err != nil {
+			return err
+		}
+		files = data.NewFallback(data.NewS3Store(s3.NewFromConfig(awsCfg), bucket, os.Getenv("AAHAT_DATA_PREFIX")), local, log)
+		if cacheTTL < 10*time.Minute {
+			cacheTTL = 10 * time.Minute // the bucket changes once per refresh; spare the round trips
+		}
+		log.Info("serving data from S3", "bucket", bucket, "prefix", os.Getenv("AAHAT_DATA_PREFIX"))
+	}
 	handler := app.Handler(app.Backends{
-		Data:          data.NewCache(local, cacheTTL),
+		Data:          data.NewCache(files, cacheTTL),
 		Store:         st,
 		Notifier:      notifier,
 		WebhookSecret: os.Getenv("AAHAT_WEBHOOK_SECRET"),
