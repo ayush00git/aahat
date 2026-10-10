@@ -12,8 +12,13 @@ SCREENING ESTIMATES, not hydrodynamic modelling:
    e-folding distance we fitted to the peak discharges NRSC's HEC-RAS runs report along the valley
    for Gepang Gath and Samudra Tapu, and to South Lhonak 2023 (Sattar et al. 2025); the fit is
    within a factor of about 2 at every point.
-4. Inundation corridor: DEM cells within `corridor_m` of the path that lie below the flood
-   level of their nearest station and connect to the river.
+4. Inundation corridor: DEM cells that lie below the flood level at the nearest point of the path
+   (levels interpolated between stations), no further to either side than the water reached on
+   the nearest station's cross-section, and connected to the river. The lateral limit matters: a
+   flood level is only meaningful inside the channel it was solved for. Without it, on a ridge,
+   a plateau or an open hillside every lower cell within `corridor_m` counted as flooded, which
+   drew fans kilometres wide around small lakes. The corridor starts at the spill point: nothing
+   behind it, and never the lake itself.
 5. Arrival time: along-path distance divided by a flood-front speed taken from observed events.
 
 The DEM is a surface model of 2011-2015 with no river bathymetry, and Manning normal depth ignores
@@ -71,6 +76,9 @@ class Station:
     arrival_min_expected: float
     arrival_min_fast: float
     section_capped: bool  # the water reached the end of the cross-section: depth may be understated
+    # how far the water reaches on the cross-section either side of the path (left/right facing downstream)
+    left_m: float = 0.0
+    right_m: float = 0.0
 
 
 @dataclass
@@ -165,7 +173,10 @@ def manning_discharge(
     return q, float(o[-1] - o[0]), capped
 
 
-def channel_centre(ground: np.ndarray, search: int = 3) -> int:
+CHANNEL_SEARCH = 3  # cells either side of the path searched for the channel
+
+
+def channel_centre(ground: np.ndarray, search: int = CHANNEL_SEARCH) -> int:
     """The lowest cell within `search` cells of the section middle: the river, if the path is slightly off."""
     mid = len(ground) // 2
     lo = max(0, mid - search)
@@ -186,6 +197,25 @@ def normal_depth_wse(offsets, ground, discharge, slope, n, max_depth=150.0) -> t
             hi = mid
     q, width, capped = manning_discharge(offsets, ground, hi, slope, n, centre)
     return hi, width, capped
+
+
+def wet_extent(offsets: np.ndarray, ground: np.ndarray, wse: float, centre: int) -> tuple[float, float]:
+    """Reach of the water (m) towards positive and negative offsets from offset 0, for water surface `wse`.
+
+    As in manning_discharge only the span connected to the channel counts, so the reach ends where
+    the section first rises above the water on each side. Never less than half a sample step.
+    """
+    half = float(offsets[1] - offsets[0]) / 2 if len(offsets) > 1 else 0.0
+    if ground[centre] >= wse:
+        lo = hi = centre
+    else:
+        wet = ground < wse
+        lo = hi = centre
+        while lo > 0 and wet[lo - 1]:
+            lo -= 1
+        while hi < len(ground) - 1 and wet[hi + 1]:
+            hi += 1
+    return max(float(offsets[hi]) + half, half), max(-float(offsets[lo]) + half, half)
 
 
 def _resample(path_xy: np.ndarray, step: float) -> tuple[np.ndarray, np.ndarray]:
@@ -216,11 +246,31 @@ def discharge_at(km: float, peak_m3s: float, attenuation_km: float) -> float:
     return peak_m3s * math.exp(-km / attenuation_km)
 
 
+def _tangents(sxy: np.ndarray) -> np.ndarray:
+    """Unit direction of travel at each station, over +/- 2 stations."""
+    out = np.empty_like(sxy, dtype=float)
+    for i in range(len(sxy)):
+        a, b = max(0, i - 2), min(len(sxy) - 1, i + 2)
+        tx, ty = sxy[b] - sxy[a]
+        norm = math.hypot(tx, ty)
+        out[i] = (tx / norm, ty / norm) if norm else (1.0, 0.0)
+    return out
+
+
+def _lake_mask(lake_xy, grid: Grid) -> np.ndarray | None:
+    if lake_xy is None or lake_xy.is_empty:
+        return None
+    return features.rasterize([lake_xy], out_shape=grid.shape, transform=grid.transform, all_touched=True).astype(bool)
+
+
 def route(
-    crs: str, path_xy: np.ndarray, peak_m3s: float, p: DownstreamParams
+    crs: str, path_xy: np.ndarray, peak_m3s: float, p: DownstreamParams, lake_xy=None
 ) -> tuple[list[Station], Grid, np.ndarray, np.ndarray]:
+    """Stations with their flood level. `lake_xy` (the lake outline, in `crs`) carries no flow: a
+    cross-section near the outlet that cuts back across the lake stops at its shore."""
     grid = mosaic_grid(crs, path_xy, p.section_half_m + p.corridor_m + 500, p.res_m)
     dem = read_dem(grid)
+    lake = _lake_mask(lake_xy, grid)
     s, sxy = _resample(path_xy, p.station_m)
     bed = sample(dem, grid, sxy[:, 0], sxy[:, 1])
     bed = np.minimum.accumulate(np.nan_to_num(bed, nan=np.inf))  # rivers only go down: used for slope
@@ -230,17 +280,23 @@ def route(
     for i in range(len(bed)):
         a, b = max(0, i - k), min(len(bed) - 1, i + k)
         slope[i] = max((bed[a] - bed[b]) / max(s[b] - s[a], 1.0), p.min_slope)
-    # direction: tangent over +/- 2 stations
+    tangents = _tangents(sxy)
     stations = []
     offsets = np.arange(-p.section_half_m, p.section_half_m + p.res_m, p.res_m)
     for i in range(len(s)):
-        a, b = max(0, i - 2), min(len(s) - 1, i + 2)
-        tx, ty = sxy[b] - sxy[a]
-        norm = math.hypot(tx, ty) or 1.0
-        nx, ny = -ty / norm, tx / norm
-        ground = sample(dem, grid, sxy[i, 0] + offsets * nx, sxy[i, 1] + offsets * ny)
+        nx, ny = -tangents[i, 1], tangents[i, 0]  # left of the direction of travel
+        xs, ys = sxy[i, 0] + offsets * nx, sxy[i, 1] + offsets * ny
+        ground = sample(dem, grid, xs, ys).astype(float)
+        if lake is not None:
+            cols, rows = ~grid.transform @ (xs, ys)
+            rows = np.clip(np.floor(rows).astype(int), 0, grid.height - 1)
+            cols = np.clip(np.floor(cols).astype(int), 0, grid.width - 1)
+            # the channel search window stays open: the spill point can touch the outline
+            wall = lake[rows, cols] & (np.abs(offsets) > CHANNEL_SEARCH * p.res_m)
+            ground[wall] = np.inf
         q = discharge_at(s[i] / 1000, peak_m3s, p.attenuation_km)
         wse, width, capped = normal_depth_wse(offsets, ground, q, float(slope[i]), p.manning_n)
+        left, right = wet_extent(offsets, ground, wse, channel_centre(ground))
         pt = to_wgs84(Point(*sxy[i]), grid.crs)
         stations.append(
             Station(
@@ -256,6 +312,8 @@ def route(
                 arrival_min_expected=round(s[i] / p.speed_expected / 60, 1),
                 arrival_min_fast=round(s[i] / p.speed_fast / 60, 1),
                 section_capped=capped,
+                left_m=round(left),
+                right_m=round(right),
             )
         )
     return stations, grid, dem, sxy
@@ -265,19 +323,65 @@ def route(
 # 4. Inundation corridor
 
 
-def corridor(stations: list[Station], grid: Grid, dem: np.ndarray, sxy: np.ndarray, p: DownstreamParams):
-    """Cells below their nearest station's flood level, within p.corridor_m of the path, connected to it."""
+def corridor(
+    stations: list[Station],
+    grid: Grid,
+    dem: np.ndarray,
+    sxy: np.ndarray,
+    p: DownstreamParams,
+    path_xy: np.ndarray | None = None,
+    lake_xy=None,
+):
+    """The flooded area: cells below the flood level, inside the wetted reach of the nearest
+    station's cross-section, connected to the river, and not behind the spill point or in the lake.
+
+    A cell takes the flood level of the nearest point of the path (levels interpolated between
+    stations when `path_xy` is given, else the nearest station's) and must lie no further from
+    the path than the water reached on that side of the nearest station's cross-section (plus half
+    a cell for the grid). So a level solved inside a channel is never applied to ground outside it, which
+    is what "below the nearest station's level within corridor_m" did on ridges and open slopes.
+    """
+    n = len(stations)
+    tangents = _tangents(np.asarray(sxy, float))
+    st_wse = np.array([st.wse_m for st in stations], float)
+    st_left = np.array([st.left_m for st in stations], float)
+    st_right = np.array([st.right_m for st in stations], float)
+    if path_xy is not None and n > 1:
+        # points every cell along the path, each with an interpolated level and its nearest station's reach
+        chain, pxy = _resample(np.asarray(path_xy, float), grid.res)
+        st_chain = np.array([st.km for st in stations], float) * 1000
+        owner = np.clip(np.rint(chain / max(p.station_m, 1e-9)).astype(int), 0, n - 1)
+        wse_pt = np.interp(chain, st_chain, st_wse)
+    else:
+        pxy, owner, wse_pt = np.asarray(sxy, float), np.arange(n), st_wse
     path_mask = np.zeros(grid.shape, bool)
-    station_id = np.full(grid.shape, -1, int)
-    for i, (x, y) in enumerate(sxy):
+    point_id = np.full(grid.shape, -1, int)
+    for i, (x, y) in enumerate(pxy):
         r, c = grid.xy_to_rowcol(x, y)
-        if 0 <= r < grid.height and 0 <= c < grid.width:
+        if 0 <= r < grid.height and 0 <= c < grid.width and point_id[r, c] < 0:
             path_mask[r, c] = True
-            station_id[r, c] = i
+            point_id[r, c] = i
     dist, (ir, ic) = ndimage.distance_transform_edt(~path_mask, return_indices=True)
-    nearest = station_id[ir, ic]
-    wse = np.array([st.wse_m for st in stations])[nearest]
-    wet = (dist * grid.res <= p.corridor_m) & np.isfinite(dem) & (dem < wse)
+    nearest = point_id[ir, ic]
+    wet = (dist * grid.res <= p.corridor_m) & np.isfinite(dem) & (dem < wse_pt[nearest])
+    # position of each candidate cell relative to its nearest path point: along and to the left of travel
+    rr, cc = np.nonzero(wet)
+    near = nearest[rr, cc]
+    own = owner[near]
+    x, y = grid.transform @ (cc + 0.5, rr + 0.5)
+    dx, dy = x - pxy[near, 0], y - pxy[near, 1]
+    tx, ty = tangents[own, 0], tangents[own, 1]
+    along, lateral = dx * tx + dy * ty, -dx * ty + dy * tx
+    tol = grid.res / 2
+    # distance from the path (the nearest point is by construction the closest), against the reach
+    # on the side the cell is on; the smoothed tangent only decides the side
+    inside = dist[rr, cc] * grid.res <= np.where(lateral >= 0, st_left[own], st_right[own]) + tol
+    inside &= ~((near == 0) & (along < -tol))  # nothing behind the spill point
+    inside &= ~((near == len(pxy) - 1) & (along > tol))  # nor beyond the end of the path
+    wet[rr, cc] = inside
+    lake = _lake_mask(lake_xy, grid)
+    if lake is not None:
+        wet &= ~lake
     wet |= path_mask
     labels, _ = ndimage.label(wet, structure=np.ones((3, 3)))
     wet = np.isin(labels, np.unique(labels[path_mask]))
@@ -286,13 +390,20 @@ def corridor(stations: list[Station], grid: Grid, dem: np.ndarray, sxy: np.ndarr
     return to_wgs84(geom, grid.crs)
 
 
+def _lake_xy(blocked_wgs84, crs: str):
+    from pyproj import CRS
+
+    return None if blocked_wgs84 is None else from_wgs84(blocked_wgs84, CRS.from_user_input(crs))
+
+
 def compute_downstream(
     start_lonlat, blocked_wgs84, peak_m3s: float, p: DownstreamParams = DownstreamParams()
 ) -> Downstream:
     crs, path_xy = trace_path(start_lonlat, blocked_wgs84, p)
     log.info("traced %.1f km", float(np.hypot(*np.diff(path_xy, axis=0).T).sum()) / 1000)
-    stations, grid, dem, sxy = route(crs, path_xy, peak_m3s, p)
-    geom = corridor(stations, grid, dem, sxy, p)
+    lake_xy = _lake_xy(blocked_wgs84, crs)
+    stations, grid, dem, sxy = route(crs, path_xy, peak_m3s, p, lake_xy)
+    geom = corridor(stations, grid, dem, sxy, p, path_xy, lake_xy)
     return Downstream(crs, [tuple(map(float, xy)) for xy in path_xy], stations, geom, asdict(p), {}, grid, dem, sxy)
 
 
@@ -301,10 +412,11 @@ def compute_scenarios(
 ) -> dict[str, Downstream]:
     """One traced path, routed once per peak-discharge scenario."""
     crs, path_xy = trace_path(start_lonlat, blocked_wgs84, p)
+    lake_xy = _lake_xy(blocked_wgs84, crs)
     out = {}
     for name, peak in peaks_m3s.items():
-        stations, grid, dem, sxy = route(crs, path_xy, peak, p)
-        geom = corridor(stations, grid, dem, sxy, p)
+        stations, grid, dem, sxy = route(crs, path_xy, peak, p, lake_xy)
+        geom = corridor(stations, grid, dem, sxy, p, path_xy, lake_xy)
         out[name] = Downstream(
             crs, [tuple(map(float, xy)) for xy in path_xy], stations, geom, asdict(p), {}, grid, dem, sxy
         )

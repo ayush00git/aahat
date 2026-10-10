@@ -175,6 +175,11 @@ def build_index(out_dir: Path) -> dict:
                 k: latest_risk[k]
                 for k in ("as_of_season", "data_until", "score", "level", "volume_m3", "peak_discharge_m3s")
             }
+            # which relation peak_discharge_m3s is, and both scenario peaks (absent from older risk.json files)
+            | {
+                k: latest_risk.get(k)
+                for k in ("peak_discharge_relation", "peak_expected_m3s", "peak_severe_m3s", "peak_expected_relation")
+            }
             if latest_risk
             else None
         )
@@ -229,9 +234,18 @@ def _downstream_summary(lake_dir: Path) -> dict | None:
     for r in exposed:
         counts.setdefault(r["kind"], {"in_flood_path": 0, "at_risk": 0})[r["status"]] += 1
     first_settlement = next((r for r in exposed if r["kind"] == "settlement"), None)
+    scenarios = d["discharge"]["scenarios"]
+    peaks = {k: v["peak_m3s"] for k, v in scenarios.items()}
     return {
         "path_km": d["path_km"],
-        "peak_m3s": {k: v["peak_m3s"] for k, v in d["discharge"]["scenarios"].items()},
+        # breach peaks at the lake, one per scenario; the relation each comes from is in peak_relations
+        "peak_expected_m3s": peaks.get("expected"),
+        "peak_severe_m3s": peaks.get("severe"),
+        "peak_relations": {k: v.get("relation") for k, v in scenarios.items()},
+        # True when both scenarios are the same flood: for small lakes Evans (expected) exceeds Huggel,
+        # and severe is the larger of the two. UIs should then show one scenario, not two equal ones.
+        "scenarios_identical": d["discharge"].get("scenarios_identical", peaks.get("expected") == peaks.get("severe")),
+        "peak_m3s": peaks,  # deprecated alias of the two keys above, kept for one release
         "first_exposed": exposed[0] | {"scenarios": None} if exposed else None,
         "first_settlement": first_settlement | {"scenarios": None} if first_settlement else None,
         "exposed_counts": counts,

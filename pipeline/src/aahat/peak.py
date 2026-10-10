@@ -64,15 +64,24 @@ SCENARIOS = {"expected": "evans1986", "severe": "huggel2002"}
 def peak_discharge(volume_m3: float) -> dict:
     """Breach peak (m3/s) per scenario with its relation, plus every relation's value for context.
 
-    For small lakes Evans exceeds Huggel; the severe scenario is whichever of the two is larger.
+    For small lakes Evans exceeds Huggel (below about 1.26 million m3, i.e. lakes under roughly
+    0.1 km2 by Huggel's volume-area relation); the severe scenario is whichever of the two is
+    larger, so there both scenarios are the same flood and `scenarios_identical` says so.
     """
     expected = RELATIONS[SCENARIOS["expected"]]
     severe = max((RELATIONS[k] for k in SCENARIOS.values()), key=lambda r: r(volume_m3))
 
     def describe(r: Relation) -> dict:
-        return {"peak_m3s": round(r(volume_m3)), "relation": r.formula, "source": r.source, "note": r.note}
+        return {
+            "peak_m3s": round(r(volume_m3)),
+            "relation_key": r.key,
+            "relation": r.formula,
+            "source": r.source,
+            "note": r.note,
+        }
 
     return {
         "scenarios": {"expected": describe(expected), "severe": describe(severe)},
+        "scenarios_identical": severe.key == expected.key,
         "all": {k: round(r(volume_m3)) for k, r in RELATIONS.items()},
     }

@@ -101,16 +101,27 @@ for each scenario), `flood_path.geojson`, `corridor_expected.geojson`, `corridor
 1. **Path:** steepest descent over the Copernicus DEM from the spill point, up to 150 km (pits escaped locally).
 2. **Breach peak, two scenarios:** *expected* = Evans 1986 (0.72·V^0.53), which lands closest to NRSC's
    HEC-RAS dam-breach peak for Gepang Gath; *severe* = the larger of that and Huggel et al. 2002
-   (0.00077·V^1.017, a regression on lakes up to 19 million m³, so extrapolated above that).
+   (0.00077·V^1.017, a regression on lakes up to 19 million m³, so extrapolated above that). Below about
+   1.26 million m³ (lakes under roughly 0.1 km²) Evans is the larger, so both scenarios are the same flood:
+   `downstream.json` and the index then carry `scenarios_identical: true`. The index's downstream summary
+   names the two peaks `peak_expected_m3s` and `peak_severe_m3s` (`peak_m3s` is a deprecated alias), and
+   `risk.json`'s `peak_discharge_m3s` is the severe one, with `peak_discharge_relation` saying which formula.
 3. **Downstream decay:** peak × exp(−km / 42.4 km), an e-folding distance fitted to the peaks NRSC report along
    the valley for both lakes and to South Lhonak 2023 (Sattar et al. 2025).
-4. **Flood level:** Manning normal depth (n = 0.06, as NRSC use below Sissu) on a DEM cross-section every 250 m.
-5. **Corridor:** DEM cells within 2 km of the path below their nearest station's flood level, connected to it.
+4. **Flood level:** Manning normal depth (n = 0.06, as NRSC use below Sissu) on a DEM cross-section every 250 m
+   (slope floored at 0.002). Only the span of the section connected to the channel carries water, and the lake
+   itself carries none.
+5. **Corridor:** DEM cells below the flood level (interpolated between stations) that lie no further from the
+   path than the water reached on that side of the nearest cross-section, connected to the river. It starts at
+   the spill point and never covers the lake. A flood level only means something inside the channel it was
+   solved for: without that limit, every lower cell within 2 km counted, which drew fans kilometres wide
+   around lakes on ridges and plateaus. Backwater up a side valley beyond a section's reach is not drawn.
 6. **Arrival:** distance ÷ flood-front speed, 10 m/s (fast) to 8 m/s (expected); South Lhonak 2023 averaged
    about 8 m/s over 67.5 km.
 7. **Exposure:** OpenStreetMap (Geofabrik northern-India extract, Overpass outside it). An asset is
    *in flood path* if it is flooded in the expected scenario, *at risk* if only in the severe one or within
-   10 m above the flood level near the corridor.
+   10 m above the flood level near the corridor. Flooded means inside the corridor: a place lower than the
+   flood level but not reached by the connected flood (behind a ridge) is not counted.
 
 **Check against NRSC's HEC-RAS modelling** (Gepang Gath, Samudra Tapu reports on Bhuvan): NRSC's peak discharge
 falls between our two scenarios at every benchmark site, and so does its flood depth at all but one

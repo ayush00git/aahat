@@ -89,3 +89,24 @@ def test_glacier_rule_scores_contact_highest_and_none_as_zero():
 
     rec = score_as_of("x", ys, lambda y: terrain(), 2019, lambda y: GlacierProximity(0.0, "RGI-x", 1.2, "2002-08-02"))
     assert next(f for f in rec.factors if f.key == "glacier").score == 1
+
+
+def test_peak_discharge_is_the_severe_scenario_and_names_its_relation():
+    from aahat.peak import peak_discharge
+
+    # 0.006 km2: Evans (expected) is larger than Huggel, so severe = expected = Evans
+    small = score_as_of("s", years({2017: 6000.0, 2018: 6000.0, 2019: 6000.0}), lambda y: terrain(), 2019)
+    assert small.peak_discharge_m3s == small.peak_severe_m3s == small.peak_expected_m3s
+    assert small.peak_discharge_relation.startswith("evans1986")
+    assert small.peak_discharge_m3s > 0.00077 * small.volume_m3**1.017 * 5  # not the (much lower) Huggel value
+    # 2 km2: Huggel is larger
+    big = score_as_of("b", years({2017: 2.0e6, 2018: 2.0e6, 2019: 2.0e6}), lambda y: terrain(), 2019)
+    assert big.peak_discharge_relation.startswith("huggel2002")
+    assert big.peak_discharge_m3s == big.peak_severe_m3s > big.peak_expected_m3s
+    assert big.peak_expected_relation.startswith("evans1986")
+    # the same numbers `aahat downstream` routes from risk.json's volume
+    routed = peak_discharge(big.volume_m3)["scenarios"]
+    assert (big.peak_expected_m3s, big.peak_severe_m3s) == (
+        routed["expected"]["peak_m3s"],
+        routed["severe"]["peak_m3s"],
+    )

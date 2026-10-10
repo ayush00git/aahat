@@ -31,6 +31,7 @@ from shapely.geometry import shape
 
 from .glaciers import RGI_DOI, GlacierProximity, glaciers_geojson, nearest_glacier
 from .laketerrain import LakeTerrain, TerrainParams, lake_terrain, outlet_geojson
+from .peak import peak_discharge
 
 HUGGEL_2002 = "https://doi.org/10.1139/t01-099"
 KOUGKOULOS_2018 = "https://doi.org/10.1016/j.scitotenv.2017.10.083"
@@ -44,11 +45,6 @@ MIN_GROWTH_YEARS = 3
 def huggel_volume_m3(area_m2: float) -> float:
     """Huggel et al. (2002): V = 0.104 A^1.42 (A in m2, V in m3)."""
     return 0.104 * area_m2**1.42
-
-
-def huggel_peak_discharge_m3s(volume_m3: float) -> float:
-    """Huggel et al. (2002), moraine-dam breach: Qmax = 0.00077 V^1.017 (m3/s)."""
-    return 0.00077 * volume_m3**1.017
 
 
 def theil_sen(x: np.ndarray, y: np.ndarray) -> float:
@@ -188,8 +184,16 @@ class RiskRecord:
     area_m2: float
     area_year: int
     volume_m3: float
+    # Breach peak of the SEVERE scenario of peak.py, the same number downstream.json routes: the larger
+    # of Huggel 2002 and Evans 1986. `peak_discharge_relation` says which one it is for this volume.
+    # (Until 2026-10 this was always Huggel 2002, which for lakes under ~1.26 million m3 is lower than
+    # the expected scenario's Evans peak, so it disagreed with the downstream summary.)
     peak_discharge_m3s: float
     terrain: dict = field(default_factory=dict)
+    peak_discharge_relation: str = ""
+    peak_expected_m3s: float | None = None  # Evans 1986
+    peak_severe_m3s: float | None = None  # = peak_discharge_m3s
+    peak_expected_relation: str = ""
 
 
 def level_for(score: float) -> str:
@@ -283,6 +287,7 @@ def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int, glaci
     total = round(100 * size * likelihood, 1)
     data_until = max((r["last_day"] for r in past if r.get("last_day")), default=None)
     t = terrain.to_dict()
+    peaks = peak_discharge(round(volume))["scenarios"]  # the rounded volume is what downstream.json routes
     return RiskRecord(
         lake_id,
         season,
@@ -295,8 +300,12 @@ def score_as_of(lake_id: str, years: list[dict], terrain_for, season: int, glaci
         current["area_m2"],
         current["year"],
         round(volume),
-        round(huggel_peak_discharge_m3s(volume)),
+        peaks["severe"]["peak_m3s"],
         {k: v for k, v in t.items() if k != "outlet_path"},
+        f"{peaks['severe']['relation_key']}: {peaks['severe']['relation']}",
+        peaks["expected"]["peak_m3s"],
+        peaks["severe"]["peak_m3s"],
+        f"{peaks['expected']['relation_key']}: {peaks['expected']['relation']}",
     )
 
 

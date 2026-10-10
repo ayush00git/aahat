@@ -55,6 +55,7 @@ def assess(d: Downstream, assets: list[Asset], max_lateral_m: float = 3000.0) ->
     near_corridor = prep(corridor.buffer(MARGIN_DISTANCE_M))
     inside = prep(corridor)
     station_km = np.array([s.km for s in d.stations])
+    edge_m = d.grid.res / 2 if d.grid is not None else 15.0
     out: list[Impact] = []
     for a in assets:
         g = from_wgs84(a.geometry, crs)
@@ -74,10 +75,13 @@ def assess(d: Downstream, assets: list[Asset], max_lateral_m: float = 3000.0) ->
         st = d.stations[i]
         z = float(sample(d.dem, d.grid, np.array([ref.x]), np.array([ref.y]))[0])
         height = None if not np.isfinite(z) else round(z - st.wse_m, 1)
-        below = height is not None and height <= 0 and g.distance(path) <= d.params["corridor_m"]
-        # A settlement or school is one OSM point: flooded only if its ground is below the flood level.
-        # Lines and areas (bridges, roads, plants) count as flooded where they enter the corridor.
-        flooded = below if g.geom_type == "Point" else (inside.intersects(g) or below)
+        # Flooded means reached by the connected flood (the corridor), not merely lower than the flood
+        # level somewhere within corridor_m of the river: ground behind a ridge, or on the far side of
+        # the plateau a lake sits on, is lower than the water and still dry.
+        # A settlement or school is one OSM point: flooded if it is in the corridor (to within half a
+        # DEM cell), whose cells are all below the flood level interpolated along the river. Lines and
+        # areas (bridges, roads, plants) count as flooded where they enter the corridor.
+        flooded = corridor.distance(g) <= edge_m if g.geom_type == "Point" else inside.intersects(g)
         if flooded:
             status = "flooded"
         elif (
