@@ -21,7 +21,7 @@ const hi = {
   homeLabel: 'आहट — मुख्य पन्ना',
 
   searchLabel: 'अपना गाँव खोजें',
-  searchPlaceholder: 'गाँव का नाम, जैसे Bhiyari',
+  searchPlaceholder: 'गाँव का नाम, जैसे Thirot',
   searchHint: 'नाम अंग्रेज़ी अक्षरों में लिखने पर ज़्यादा गाँव मिलेंगे।',
   searching: 'खोज रहे हैं…',
   noResults: 'कोई गाँव नहीं मिला। नाम अंग्रेज़ी अक्षरों में लिखकर देखें।',
@@ -213,7 +213,7 @@ const en: Strings = {
   homeLabel: 'Aahat home',
 
   searchLabel: 'Find your village',
-  searchPlaceholder: 'Village name, e.g. Bhiyari',
+  searchPlaceholder: 'Village name, e.g. Thirot',
   searchHint: 'Type the name in English letters.',
   searching: 'Searching…',
   noResults: 'No village found. Try spelling the name in English letters.',
