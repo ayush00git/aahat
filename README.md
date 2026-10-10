@@ -12,6 +12,8 @@ Built for [Environmental Hacks](https://www.wemakedevs.org/aws/env) (WeMakeDevs 
 | `web/` | Villager view (Hindi first) and officials' dashboard | TypeScript + MapLibre |
 | `infra/` | AWS infrastructure | IaC |
 
+The HTTP API is documented in [API.md](API.md): lake data, weather trigger, places, the Hindi assistant, alerts and researcher jobs, with examples.
+
 ## Pipeline quick start
 
 ```bash

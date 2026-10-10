@@ -68,13 +68,13 @@ otherwise `normal`. These are screening thresholds chosen by us, not a published
 
 `AAHAT_WEATHER_URL` overrides the Open-Meteo forecast endpoint.
 
-## Assistant (Amazon Bedrock)
+## Assistant (Claude)
 
 `POST /ask` `{"question": "...", "lang": "hi"|"en" (default hi), "place_osm": "node/123" (optional)}`
 answers a villager's question in 2-5 short sentences:
 `{"answer", "lang", "sources": [{"tool", "args"}], "audio_url"?, "mode": "model"|"template"}`.
 
-`internal/assistant` runs Claude through the Bedrock Converse API with five tools: `search_places`,
+`internal/assistant` runs Claude (Anthropic API, or the Bedrock Converse API) with five tools: `search_places`,
 `place_threats`, `list_lakes`, `lake_summary`, `what_to_do`. The tools call this API's own routes in
 process, so the model sees what the apps show. The model supplies no numbers: after it answers, every
 number in the text must appear in a tool result of that conversation (or be 112 / 1077, or a returned
@@ -85,7 +85,9 @@ client IP per minute (`AAHAT_ASK_PER_MIN`). With Polly on, the answer is also sp
 
 | Variable | Meaning |
 | --- | --- |
-| `AAHAT_BEDROCK_MODEL` | Model or inference profile id. Unset: `/ask` answers 503 |
+| `AAHAT_ANTHROPIC_API_KEY` | Anthropic API key; takes precedence over Bedrock. Set on the server by `infra/ec2/anthropic-key.sh` |
+| `AAHAT_ANTHROPIC_MODEL` | Model id (default `claude-sonnet-5-5`) |
+| `AAHAT_BEDROCK_MODEL` | Bedrock model or inference profile id. With neither set, `/ask` answers 503 |
 | `AAHAT_BEDROCK_REGION` | Region to call Bedrock in (default `AWS_REGION`) |
 
 `infra/ec2/bedrock-access.sh` picks a model, tests it, grants the server's role and sets both variables.
