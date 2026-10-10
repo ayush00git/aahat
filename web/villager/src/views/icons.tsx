@@ -14,7 +14,7 @@ function Svg({ size = 24, class: cls, children, fill }: P & { children: JSX.Elem
       viewBox="0 0 24 24"
       fill={fill ? 'currentColor' : 'none'}
       stroke={fill ? 'none' : 'currentColor'}
-      stroke-width="2.2"
+      stroke-width="1.8"
       stroke-linecap="round"
       stroke-linejoin="round"
       aria-hidden="true"
@@ -150,6 +150,12 @@ export const IconUphill = (p: P) => (
 export const IconPlay = (p: P) => (
   <Svg {...p} fill>
     <path d="M7 4.2v15.6a1 1 0 0 0 1.5.9l12.3-7.8a1 1 0 0 0 0-1.8L8.5 3.3A1 1 0 0 0 7 4.2Z" />
+  </Svg>
+);
+
+export const IconSend = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 12h15M13 6l6 6-6 6" />
   </Svg>
 );
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { getLakes, type LakeSummary, type Threats } from '../api';
+import type { LakeSummary, Threats } from '../api';
 import { STRINGS, useI18n, type Lang, type Strings } from '../i18n';
 import { adminLine, altName, dateTime, lakeName, num, placeName, wholeMinutes } from '../format';
 import { href } from '../router';
@@ -11,7 +11,9 @@ import { NearbyCard, ThreatCard, WeatherLine } from './ThreatCard';
 import { Actions, EmergencyNumbers } from './Actions';
 import { MySubscriptions } from './MySubscriptions';
 import { ShareButton } from './Share';
-import { IconBack, IconBell, IconCheck, IconMap, IconUnknown } from './icons';
+import { Ask } from './Ask';
+import { setSelection, useLakes } from '../mapStore';
+import { IconBack, IconBell, IconCheck, IconFlood, IconUnknown, IconWarn } from './icons';
 
 /** Names for the heading: the API's, else the ones search gave (uncovered places). */
 function names(data: Threats) {
@@ -32,84 +34,111 @@ export function PlaceView({ osm }: { osm: string }) {
   const admin = adminLine(data.district || data.state ? data : (rememberedAdmin(osm) ?? {}), t.districtLine);
   const nearby = data.nearby ?? [];
   const danger = data.threats.length > 0;
+  const red = data.threats.some((th) => th.status === 'in_flood_path');
   const shareText = shareMessage(data, name, t, lang);
 
   return (
-    <div class="stack">
-      <BackLink />
-      <div class="place-head">
-        <h1 class="place-name">{name}</h1>
-        {alt && <p class="place-alt">{alt}</p>}
-        {admin && <p class="place-admin">{admin}</p>}
+    <>
+      <PlaceOnMap data={named} label={name} />
+      <div class="pane pane-top">
+        <BackLink />
+        <div class="place-head">
+          <h1 class="place-name">{name}</h1>
+          {(alt || admin) && <p class="place-meta">{[alt, admin].filter(Boolean).join(' · ')}</p>}
+        </div>
+
+        {/* The answer in one line, above the map. */}
+        {danger && (
+          <h2 id="danger-h" class={`verdict ${red ? 'verdict-red' : 'verdict-orange'}`} aria-live="polite">
+            {red ? <IconFlood size={20} /> : <IconWarn size={20} />}
+            <span>{t.dangerTitle(data.threats.length)}</span>
+          </h2>
+        )}
+        {data.known && data.safe && !danger && (
+          <h2 class="verdict verdict-green" aria-live="polite">
+            <IconCheck size={20} />
+            <span>{t.safeTitle}</span>
+          </h2>
+        )}
+        {!data.known && (
+          <h2 id="nc-h" class="verdict verdict-grey" aria-live="polite">
+            <IconUnknown size={20} />
+            <span>{t.notCoveredTitle}</span>
+          </h2>
+        )}
       </div>
 
-      {savedAt && (
-        <p class="banner banner-offline" role="status">
-          {t.savedCopy(dateTime(savedAt, lang))}
-        </p>
-      )}
+      <div class="pane pane-rest">
+        {savedAt && (
+          <p class="note note-warn" role="status">
+            {t.savedCopy(dateTime(savedAt, lang))}
+          </p>
+        )}
 
-      {!data.known && <NotCovered data={named} />}
+        {!data.known && <NotCovered data={named} />}
 
-      {data.known && data.safe && (
-        <section class="status status-safe" aria-live="polite">
-          <div class="status-head">
-            <span class="status-badge" aria-hidden="true">
-              <IconCheck size={30} />
-            </span>
-            <h2 class="status-title">{t.safeTitle}</h2>
-          </div>
-          <p class="small">{t.safeCaveat}</p>
-        </section>
-      )}
+        {data.known && data.safe && !danger && <p class="caveat">{t.safeCaveat}</p>}
 
+        {danger && (
+          <section class="stack" aria-labelledby="danger-h">
+            {data.threats.map((th) => (
+              <ThreatCard key={th.lake_id} threat={th} />
+            ))}
+          </section>
+        )}
 
-      {danger && (
-        <section class="stack" aria-labelledby="danger-h">
-          <h2 id="danger-h" class="section-title danger-title">
-            {t.dangerTitle(data.threats.length)}
-          </h2>
-          {data.threats.map((th) => (
-            <ThreatCard key={th.lake_id} threat={th} />
-          ))}
-        </section>
-      )}
+        {nearby.length > 0 && (
+          <section class="stack-sm" aria-labelledby="near-h">
+            <h2 id="near-h" class="section-label">
+              {t.nearbyTitle}
+            </h2>
+            {nearby.map((th) => (
+              <NearbyCard key={th.lake_id} threat={th} />
+            ))}
+          </section>
+        )}
 
-      {nearby.length > 0 && (
-        <section class="stack" aria-labelledby="near-h">
-          <h2 id="near-h" class="section-title nearby-title">
-            {t.nearbyTitle}
-          </h2>
-          {nearby.map((th) => (
-            <NearbyCard key={th.lake_id} threat={th} />
-          ))}
-        </section>
-      )}
+        {data.known && !danger && <NearbyLakesSection data={named} />}
 
-      {data.known && !danger && <NearbyLakesSection data={named} />}
-
-      {data.known && (
-        <div class="btn-row">
-          <a class={`btn ${danger ? 'btn-primary' : 'btn-secondary'}`} href={href.subscribe(osm)}>
-            <IconBell size={22} />
-            {t.subscribeCta}
-          </a>
-          {(danger || nearby.length > 0) && (
-            <a class="btn btn-secondary" href={href.map(osm)}>
-              <IconMap size={22} />
-              {t.openMap}
+        {data.known && (
+          <div class="btn-row">
+            <a class={`btn ${danger ? 'btn-primary' : 'btn-secondary'}`} href={href.subscribe(osm)}>
+              <IconBell size={18} />
+              {t.subscribeCta}
             </a>
-          )}
-          {shareText && <ShareButton text={shareText} link={placeLink(osm)} />}
-        </div>
-      )}
+            {shareText && <ShareButton text={shareText} link={placeLink(osm)} />}
+          </div>
+        )}
 
-      <MySubscriptions osm={osm} />
+        <MySubscriptions osm={osm} />
 
-      {(danger || nearby.length > 0) && <Actions />}
-      <EmergencyNumbers />
-    </div>
+        <Ask osm={osm} />
+
+        {(danger || nearby.length > 0) && <Actions />}
+        <EmergencyNumbers />
+      </div>
+    </>
   );
+}
+
+/**
+ * Tells the map which place is on screen: its position and the lakes whose
+ * flood reaches it (else the ones passing nearby). Renders nothing.
+ */
+export function PlaceOnMap({ data, label }: { data: Threats; label: string }) {
+  const here = useHere(data);
+  const ids = (data.threats.length > 0 ? data.threats : (data.nearby ?? [])).map((th) => th.lake_id).join(',');
+  useEffect(() => {
+    if (here === undefined) return; // still looking the position up
+    setSelection({
+      osm: data.osm,
+      label,
+      lonlat: here,
+      floodLakes: ids ? ids.split(',') : [],
+      threatening: data.threats.length > 0,
+    });
+  }, [data.osm, label, here?.[0], here?.[1], ids, data.threats.length > 0]);
+  return null;
 }
 
 /**
@@ -125,22 +154,6 @@ function shareMessage(data: Threats, place: string, t: Strings, lang: Lang): str
     return data.threats.length > 0 ? t.shareThreat(lake, place, min) : t.shareNearby(lake, place, min);
   }
   return data.known && data.safe ? t.shareSafe(place) : null;
-}
-
-/** All monitored lakes (GET /lakes, saved for offline use). */
-function useLakes(): LakeSummary[] | null | 'error' {
-  const [lakes, setLakes] = useState<LakeSummary[] | null | 'error'>(null);
-  useEffect(() => {
-    let live = true;
-    getLakes().then(
-      (ls) => live && setLakes(ls),
-      () => live && setLakes('error'),
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
-  return lakes;
 }
 
 /**
@@ -195,7 +208,7 @@ function NearestLakeList({ data, note, fallbackAll }: { data: Named; note: strin
   return (
     <>
       <h3 class="section-label">{t.nearestLakes}</h3>
-      <p class="small">{note}</p>
+      <p class="small muted-2">{note}</p>
       <LakeList lakes={near} />
       <p class="lake-note">{t.straightNote}</p>
     </>
@@ -238,20 +251,12 @@ function NotCovered({ data }: { data: Named }) {
   const { t, lang } = useI18n();
   const other = STRINGS[lang === 'hi' ? 'en' : 'hi'];
   return (
-    <section class="status status-unknown" aria-live="polite" aria-labelledby="nc-h">
-      <div class="status-head">
-        <span class="status-badge" aria-hidden="true">
-          <IconUnknown size={30} />
-        </span>
-        <h2 id="nc-h" class="status-title">
-          {t.notCoveredTitle}
-        </h2>
-      </div>
-      <p class="status-alt" lang={lang === 'hi' ? 'en' : 'hi'}>
+    <section class="stack-sm" aria-labelledby="nc-h">
+      <p class="caveat-alt" lang={lang === 'hi' ? 'en' : 'hi'}>
         {other.notCoveredTitle}
       </p>
-      <p class="small">{t.notCoveredBody}</p>
-      <div class="lakes">
+      <p class="caveat">{t.notCoveredBody}</p>
+      <div class="card stack-sm">
         <NearestLakeList data={data} note={t.nearestUncovered} fallbackAll />
       </div>
     </section>
@@ -262,7 +267,7 @@ function NotCovered({ data }: { data: Named }) {
 function NearbyLakesSection({ data }: { data: Named }) {
   const { t } = useI18n();
   return (
-    <section class="near-lakes" aria-label={t.nearestLakes}>
+    <section class="card stack-sm" aria-label={t.nearestLakes}>
       <NearestLakeList data={data} note={t.nearestSafe} fallbackAll={false} />
     </section>
   );
@@ -272,7 +277,7 @@ export function BackLink({ to }: { to?: string }) {
   const { t } = useI18n();
   return (
     <a class="back" href={to ?? href.home()}>
-      <IconBack size={22} /> {t.back}
+      <IconBack size={18} /> {t.back}
     </a>
   );
 }
@@ -280,24 +285,27 @@ export function BackLink({ to }: { to?: string }) {
 export function PlaceStatus({ state }: { state: Exclude<PlaceState, { kind: 'ok' }> }) {
   const { t } = useI18n();
   return (
-    <div class="stack">
-      <BackLink />
-      {state.kind === 'loading' ? (
-        <div class="skeleton" role="status">
-          <span class="skel skel-title" />
-          <span class="skel skel-card" />
-          <p class="muted">{t.loading}</p>
-        </div>
-      ) : (
-        <div class="note note-neutral stack-sm" role="alert">
-          <p>{state.notFound ? t.unknownTitle : t.loadError}</p>
-          {!state.notFound && (
-            <button type="button" class="btn btn-secondary" onClick={state.retry}>
-              {t.retry}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+    <>
+      <div class="pane pane-top">
+        <BackLink />
+        {state.kind === 'loading' ? (
+          <div class="skeleton" role="status">
+            <span class="skel skel-title" />
+            <span class="skel skel-card" />
+            <p class="muted small">{t.loading}</p>
+          </div>
+        ) : (
+          <div class="note stack-sm" role="alert">
+            <p>{state.notFound ? t.unknownTitle : t.loadError}</p>
+            {!state.notFound && (
+              <button type="button" class="btn btn-secondary" onClick={state.retry}>
+                {t.retry}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <div class="pane pane-rest" />
+    </>
   );
 }

@@ -3,11 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#173f73" />
+    <meta name="theme-color" content="#0f1722" />
+    <meta name="color-scheme" content="dark" />
     <meta name="description" content="आहट: हिमनद झील बाढ़ चेतावनी — क्या आपका गाँव बाढ़ मार्ग में है? Glacial lake flood warnings for Himachal villages." />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <!-- Same faces as the officials' dashboard. Loaded without blocking the first
+         paint; offline (or before they arrive) the phone's own fonts are used. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <style>
+      html { background: #0c131d; }
+    </style>
     <title>आहट — बाढ़ चेतावनी</title>
   </head>
   <body>

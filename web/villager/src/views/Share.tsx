@@ -20,7 +20,7 @@ export function ShareButton({ text, link, invert }: { text: string; link: string
   };
   return (
     <a class={`btn btn-share${invert ? ' btn-share-invert' : ''}`} href={wa} target="_blank" rel="noopener noreferrer" onClick={onClick}>
-      <IconWhatsApp size={24} class="share-icon" />
+      <IconWhatsApp size={18} class="share-icon" />
       {t.shareWhatsApp}
     </a>
   );

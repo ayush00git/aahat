@@ -6,7 +6,7 @@ export function Actions() {
   const { t, lang } = useI18n();
   return (
     <section class="todo" aria-labelledby="todo-h">
-      <h2 id="todo-h" class="section-title">
+      <h2 id="todo-h" class="section-label">
         {t.whatToDo}
       </h2>
       <ol class="action-list">
@@ -27,7 +27,7 @@ export function EmergencyNumbers({ invert = false }: { invert?: boolean }) {
         {EMERGENCY_NUMBERS.map((n) => (
           <a key={n.number} class={invert ? 'call call-invert' : 'call'} href={`tel:${n.number}`}>
             <span class="call-icon" aria-hidden="true">
-              <IconPhone size={20} />
+              <IconPhone size={16} />
             </span>
             <span class="call-num">{n.number}</span>
             <span class="call-label">{n.label[lang]}</span>

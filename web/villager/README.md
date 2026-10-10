@@ -6,8 +6,8 @@ minutes the water could take, and what to do. Every number on screen comes
 from the Aahat API. The app only formats them, showing whole minutes rounded
 down, which is the same rule the SMS, voice and push messages use.
 
-Stack: Vite, TypeScript and Preact. MapLibre GL is lazy-loaded only on the map
-screen. The service worker is hand-written (`sw/sw.js`).
+Stack: Vite, TypeScript and Preact. MapLibre GL is lazy-loaded after the first
+paint (on a data-saver or 2G connection only when the villager taps "show map"). The service worker is hand-written (`sw/sw.js`).
 
 ## Run (development)
 
@@ -56,10 +56,10 @@ See `.env.example`.
 
 | Route                  | Screen |
 |------------------------|--------|
-| `#/`                   | Home: name and tagline over an inline-SVG Himalayan scene, village search (debounced; a "निगरानी में" badge when a result has `covered: true`, nothing when the field is missing), last-viewed village, install button |
+| `#/`                   | Home: village search (debounced; a "निगरानी में" badge when a result has `covered: true`, nothing when the field is missing), last-viewed village, "ask a question" (`POST /ask`), emergency numbers, install button |
 | `#/p/node/123`         | Village result: safe, not covered (`known: false`: says so in Hindi and English and lists the monitored lakes from `GET /lakes`), or one card per threatening lake (nearest first); amber cards for floods passing nearby (`nearby`); "क्या करें" |
 | `#/p/node/123/subscribe` | Sign up: SMS, phone call (shown as "coming soon"), or app notification (web push, shown only if the browser supports it and `GET /push/public-key` answers) |
-| `#/p/node/123/map`     | Map (lazy): village, latest lake outline, flood path, expected/severe corridors |
+| `#/p/node/123/map`     | Old link: opens the village result (the map is now on every screen) |
 | `#/alert?…`            | Full-screen red alert, opened from a push notification |
 
 ## Where things are
@@ -69,9 +69,12 @@ See `.env.example`.
 - `src/api.ts`: API client and response types. Saves the last threats answer per village in localStorage so the page opens offline.
 - `src/push.ts`: service worker registration, Web Push subscribe and unsubscribe.
 - `sw/sw.js`: service worker template. At build time `vite.config.ts` writes `dist/sw.js` with the app-shell precache list. It handles offline fallback, `push` (shows the notification) and `notificationclick` (opens `#/alert`).
-- `src/fonts/`: Eczar 700 (SIL OFL, see `OFL.txt`), subset to Devanagari and basic Latin: the display face for the name, headings and big numbers. Two files, about 58 KB together, `font-display: swap`; body text uses the phone's own fonts.
+- Fonts: Inter and Noto Sans Devanagari from Google Fonts, as on the officials' dashboard, loaded without blocking the first paint; offline the phone's own fonts are used. (`src/fonts/` holds the Eczar files of the earlier design; they are no longer referenced.)
 - `src/views/icons.tsx`: inline SVG icons.
 - `src/map/initMap.ts`: everything MapLibre. It is the only module that imports it, so the map stays out of the first-load bundle.
+- `src/views/MapPanel.tsx`, `src/mapStore.ts`: the map shown on every screen (under the screen's header on a phone, filling the right of the window from 1024px): all monitored lakes coloured by risk, the selected village, and the flood path and corridors of the lakes that reach or pass it.
+- `src/views/Ask.tsx`: the "ask a question" card.
+- `src/styles.css`: the dark theme shared with the officials' dashboard (same tokens).
 
 ## Push payload
 

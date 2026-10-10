@@ -7,7 +7,7 @@ import { href } from '../router';
 import { addSubscription, type SavedSubscription } from '../storage';
 import { PushDeniedError, pushSupported, subscribePush } from '../push';
 import { usePlace } from '../usePlace';
-import { BackLink, PlaceStatus } from './Place';
+import { BackLink, PlaceOnMap, PlaceStatus } from './Place';
 import { SubRow } from './MySubscriptions';
 import { IconBell, IconCheck, IconPhone, IconSms } from './icons';
 
@@ -93,53 +93,56 @@ function SubscribeForm({ osm, place }: { osm: string; place: Threats }) {
 
   if (done) {
     return (
-      <div class="stack">
-        <BackLink to={href.place(osm)} />
-        <section class="status status-safe" aria-live="polite">
-          <div class="status-head">
-            <span class="status-badge" aria-hidden="true">
-              <IconCheck size={30} />
-            </span>
-            <h1 class="status-title">{stopped ? t.unsubscribed : t.success}</h1>
-          </div>
+      <>
+        <PlaceOnMap data={place} label={shown} />
+        <div class="pane pane-top">
+          <BackLink to={href.place(osm)} />
+          <h1 class="verdict verdict-green" aria-live="polite">
+            <IconCheck size={20} />
+            <span>{stopped ? t.unsubscribed : t.success}</span>
+          </h1>
+        </div>
+        <div class="pane pane-rest">
           {!stopped && (
-            <>
+            <section class="card stack-sm">
               <p>{t.successBody(shown)}</p>
               <SubRow sub={done} onRemoved={() => setStopped(true)} />
-            </>
+            </section>
           )}
-        </section>
-        <a class="btn btn-primary" href={href.place(osm)}>
-          {t.done}
-        </a>
-      </div>
+          <a class="btn btn-primary" href={href.place(osm)}>
+            {t.done}
+          </a>
+        </div>
+      </>
     );
   }
 
   const channels: { id: Channel; label: string; help: string; icon: JSX.Element; disabled?: boolean }[] = [
-    { id: 'sms', label: t.channel_sms, help: t.channelSmsHelp, icon: <IconSms size={26} /> },
+    { id: 'sms', label: t.channel_sms, help: t.channelSmsHelp, icon: <IconSms size={20} /> },
     {
       id: 'voice',
       label: t.channel_voice,
       help: t.channelVoiceHelp,
-      icon: <IconPhone size={26} />,
+      icon: <IconPhone size={20} />,
       disabled: !VOICE_AVAILABLE,
     },
   ];
-  if (pushKey) channels.push({ id: 'webpush', label: t.channel_webpush, help: t.channelPushHelp, icon: <IconBell size={26} /> });
+  if (pushKey) channels.push({ id: 'webpush', label: t.channel_webpush, help: t.channelPushHelp, icon: <IconBell size={20} /> });
 
   // The steps are numbered as shown: app notifications need no phone number.
   const total = needsPhone ? 3 : 2;
   const confirmStep = needsPhone ? 3 : 2;
 
   return (
-    <div class="stack">
-      <BackLink to={href.place(osm)} />
-      <div class="stack-sm">
+    <>
+      <PlaceOnMap data={place} label={shown} />
+      <div class="pane pane-top">
+        <BackLink to={href.place(osm)} />
         <h1 class="page-title">{t.subscribeCta}</h1>
         <p class="lead">{t.subscribeIntro(shown)}</p>
       </div>
 
+      <div class="pane pane-rest">
       <form class="steps" onSubmit={submit} noValidate>
         <fieldset class="step">
           <legend class="step-head">
@@ -219,11 +222,12 @@ function SubscribeForm({ osm, place }: { osm: string; place: Threats }) {
             </p>
           )}
 
-          <button type="submit" class="btn btn-primary btn-big" disabled={busy}>
+          <button type="submit" class="btn btn-primary btn-block" disabled={busy}>
             {busy ? t.submitting : t.submit}
           </button>
         </div>
       </form>
-    </div>
+      </div>
+    </>
   );
 }

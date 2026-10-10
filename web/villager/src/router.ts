@@ -2,7 +2,7 @@
 //   #/                       home / search
 //   #/p/node/123             village result
 //   #/p/node/123/subscribe   sign up for warnings
-//   #/p/node/123/map         map
+//   #/p/node/123/map         (old link) the village result; the map is on every screen
 //   #/alert?title=…&min=…    full-screen alert (opened from a push notification)
 
 import { useEffect, useState } from 'preact/hooks';
@@ -11,7 +11,6 @@ export type Route =
   | { name: 'home' }
   | { name: 'place'; osm: string }
   | { name: 'subscribe'; osm: string }
-  | { name: 'map'; osm: string }
   | { name: 'alert'; params: URLSearchParams };
 
 export function parse(hash: string): Route {
@@ -22,7 +21,6 @@ export function parse(hash: string): Route {
   if (m) {
     const osm = `${m[1]}/${m[2]}`;
     if (m[3] === 'subscribe') return { name: 'subscribe', osm };
-    if (m[3] === 'map') return { name: 'map', osm };
     return { name: 'place', osm };
   }
   return { name: 'home' };
@@ -32,7 +30,6 @@ export const href = {
   home: () => '#/',
   place: (osm: string) => `#/p/${osm}`,
   subscribe: (osm: string) => `#/p/${osm}/subscribe`,
-  map: (osm: string) => `#/p/${osm}/map`,
 };
 
 export function navigate(to: string): void {

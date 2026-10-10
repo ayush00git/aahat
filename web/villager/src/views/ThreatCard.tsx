@@ -27,7 +27,7 @@ export function WeatherLine({ lakeId, quiet }: { lakeId: string; quiet?: boolean
   if (!text) return null;
   return (
     <p class={`weather-line weather-${w.level}`}>
-      <IconRain size={20} />
+      <IconRain size={16} />
       <span>
         {text} <span class="weather-src">{t.weatherSource}</span>
       </span>
@@ -46,7 +46,7 @@ export function ThreatCard({ threat: th }: { threat: Threat }) {
   return (
     <article class={`scard ${red ? 'scard-red' : 'scard-orange'}`} aria-labelledby={titleId}>
       <p class="scard-band">
-        {red ? <IconFlood size={26} /> : <IconWarn size={26} />}
+        {red ? <IconFlood size={16} /> : <IconWarn size={16} />}
         <span>{red ? t.badge_in_flood_path : t.badge_at_risk}</span>
       </p>
       <div class="scard-body">
@@ -70,13 +70,13 @@ export function ThreatCard({ threat: th }: { threat: Threat }) {
           <ul class="facts">
             {expected !== null && (
               <li>
-                <IconClock size={20} />
+                <IconClock size={16} />
                 {t.arrivalExpected(wholeMinutes(expected))}
               </li>
             )}
             {th.km !== null && (
               <li>
-                <IconRiver size={20} />
+                <IconRiver size={16} />
                 {t.distance(num(th.km, lang, 0))}
               </li>
             )}
@@ -146,7 +146,7 @@ export function NearbyCard({ threat: th }: { threat: Threat }) {
   return (
     <article class="scard scard-amber" aria-labelledby={titleId}>
       <p class="scard-band">
-        <IconNearby size={26} />
+        <IconNearby size={16} />
         <span>{t.nearbyBadge}</span>
       </p>
       <div class="scard-body">
@@ -164,13 +164,13 @@ export function NearbyCard({ threat: th }: { threat: Threat }) {
           <ul class="facts">
             {th.lateral_m != null && (
               <li>
-                <IconNearby size={20} />
+                <IconNearby size={16} />
                 {t.nearbyRiver(num(th.lateral_m, lang, 0))}
               </li>
             )}
             {th.km !== null && (
               <li>
-                <IconRiver size={20} />
+                <IconRiver size={16} />
                 {t.distance(num(th.km, lang, 0))}
               </li>
             )}

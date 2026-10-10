@@ -181,6 +181,8 @@ export interface LakeSummary {
   name_hi: string;
   district: string;
   risk_level: RiskLevel | null;
+  /** The API's risk score; missing in copies saved by older app versions. */
+  risk_score?: number | null;
   /** Lake position from the API; null in copies saved by older app versions. */
   lat: number | null;
   lon: number | null;
@@ -213,6 +215,7 @@ export async function getLakes(): Promise<LakeSummary[]> {
         name_hi: l.name_hi,
         district: l.district,
         risk_level: l.risk?.level ?? null,
+        risk_score: typeof l.risk?.score === 'number' ? l.risk.score : null,
         lat: typeof l.lat === 'number' ? l.lat : null,
         lon: typeof l.lon === 'number' ? l.lon : null,
       }));
@@ -254,6 +257,41 @@ export function getWeather(): Promise<Map<string, LakeWeather>> {
     );
   }
   return weatherMemo;
+}
+
+/** The assistant's answer (POST /ask). */
+export interface AskAnswer {
+  answer: string;
+  lang: string;
+  sources?: { tool: string; args?: unknown }[];
+  /** Spoken answer: a path under the API base, e.g. "/audio/abc.mp3". */
+  audio_url?: string | null;
+  mode?: string;
+}
+
+/** ask sends one question to the Aahat assistant. It can take 7-15 seconds. */
+export function ask(req: { question: string; lang: 'hi' | 'en'; place_osm?: string }): Promise<AskAnswer> {
+  return request<AskAnswer>('/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+}
+
+let lakesMemo: Promise<LakeSummary[]> | null = null;
+
+/**
+ * lakesOnce shares one GET /lakes between the map and the result page for the
+ * app session (a failed fetch is retried on the next call).
+ */
+export function lakesOnce(): Promise<LakeSummary[]> {
+  if (!lakesMemo) {
+    lakesMemo = getLakes().catch((err) => {
+      lakesMemo = null;
+      throw err;
+    });
+  }
+  return lakesMemo;
 }
 
 export const layerURL = (lakeId: string, name: string) =>

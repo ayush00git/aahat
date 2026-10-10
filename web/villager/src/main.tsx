@@ -10,7 +10,7 @@ import { Footer } from './views/Footer';
 import { Home } from './views/Home';
 import { PlaceView } from './views/Place';
 import { Subscribe } from './views/Subscribe';
-import { MapScreen } from './views/MapScreen';
+import { MapPanel } from './views/MapPanel';
 import { Alert, alertHash } from './views/Alert';
 
 function initialLang(): Lang {
@@ -60,19 +60,21 @@ function App() {
 
   return (
     <LangContext.Provider value={ctx}>
-      <Header home={route.name === 'home'} />
+      <Header />
       {!online && (
-        <p class="banner banner-offline" role="status">
+        <p class="offline-bar" role="status">
           {ctx.t.offline}
         </p>
       )}
-      <main id="main" class={route.name === 'home' ? 'main main-home' : 'main'}>
+      {/* Each screen renders two blocks, .pane-top and .pane-rest; the map sits
+          between them on a phone and beside them on a laptop (see styles.css). */}
+      <main id="main" class={`shell shell-${route.name}`}>
         {route.name === 'home' && <Home />}
-        {route.name === 'place' && <PlaceView osm={route.osm} />}
-        {route.name === 'subscribe' && <Subscribe osm={route.osm} />}
-        {route.name === 'map' && <MapScreen osm={route.osm} />}
+        {route.name === 'place' && <PlaceView key={route.osm} osm={route.osm} />}
+        {route.name === 'subscribe' && <Subscribe key={route.osm} osm={route.osm} />}
+        <MapPanel />
+        <Footer />
       </main>
-      <Footer />
     </LangContext.Provider>
   );
 }
