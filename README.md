@@ -124,16 +124,18 @@ for each scenario), `flood_path.geojson`, `corridor_expected.geojson`, `corridor
    flood level but not reached by the connected flood (behind a ridge) is not counted.
 
 **Check against NRSC's HEC-RAS modelling** (Gepang Gath, Samudra Tapu reports on Bhuvan): NRSC's peak discharge
-falls between our two scenarios at every benchmark site, and so does its flood depth at all but one
-(Sissu below Gepang Gath, where NRSC's 21.5 m exceeds our 17.5 m severe depth).
+falls between our two scenarios at every benchmark site. Its flood depth does so at three of the five: at Sissu
+below Gepang Gath NRSC's 21.5 m exceeds our 17.5 m severe depth, and at Tandi below Gepang Gath NRSC's 10.4 m is
+under our 11.8 m expected depth. Our depths are the median of the stations within 1 km of the site, because
+normal depth on a 30 m DEM varies by several metres from one cross-section to the next.
 
 | Site | NRSC peak, depth | Ours expected → severe |
 |---|---|---|
-| Gepang Gath → Sissu, 11 km | 9,378 m³/s, 21.5 m | 5,839, 7.1 m → 30,954, 17.5 m |
-| Gepang Gath → Tandi, 31 km | 4,123 m³/s, 10.4 m | 3,643, 11.8 m → 19,314, 25.9 m |
-| Samudra Tapu → Batal, 17.8 km | 15,692 m³/s, 17.1 m | 6,792, 13.8 m → 48,038, 32.3 m |
-| Samudra Tapu → Khoksar, 67 km | 6,665 m³/s, 12.9 m | 2,126, 5.8 m → 15,036, 14.8 m |
-| Samudra Tapu → Tandi, 110 km | 3,275 m³/s, 9.4 m | 773, 4.2 m → 5,470, 11.6 m |
+| Gepang Gath → Sissu, 11 km | 9,378 m³/s, 21.5 m | 5,837, 7.4 m → 30,947, 17.5 m |
+| Gepang Gath → Tandi, 31 km | 4,123 m³/s, 10.4 m | 3,642, 11.8 m → 19,309, 25.5 m |
+| Samudra Tapu → Batal, 17.8 km | 15,692 m³/s, 17.1 m | 6,811, 14.2 m → 48,170, 32.8 m |
+| Samudra Tapu → Khoksar, 67 km | 6,665 m³/s, 12.9 m | 2,132, 5.6 m → 15,077, 14.8 m |
+| Samudra Tapu → Tandi, 110 km | 3,275 m³/s, 9.4 m | 773, 3.5 m → 5,469, 10.6 m |
 
 NRSC reports: [Gepang Gath](https://bhuvan.nrsc.gov.in/nhpfs/pdf/NRSC_GhepangGhatGlacialLake_GLOF_Risk_Assessment_Report.pdf),
 [Samudra Tapu](https://bhuvan.nrsc.gov.in/nhpfs/pdf/NRSC_SamudraTapuGlacialLake_GLOF_Risk_Assessment_Report.pdf).
