@@ -27,7 +27,7 @@ aahat = "aahat.cli:main"
 line-length = 120
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["aahat.water.WaterParams", "WaterParams", "aahat.laketerrain.TerrainParams", "TerrainParams", "aahat.downstream.DownstreamParams", "DownstreamParams", "aahat.barrier.BarrierParams", "BarrierParams"]
+extend-immutable-calls = ["aahat.water.WaterParams", "WaterParams", "aahat.laketerrain.TerrainParams", "TerrainParams", "aahat.downstream.DownstreamParams", "DownstreamParams", "aahat.barrier.BarrierParams", "BarrierParams", "aahat.drain.DrainParams", "DrainParams"]
 
 [dependency-groups]
 dev = [

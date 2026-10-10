@@ -97,9 +97,33 @@ def cmd_barrier(args) -> None:
     result = {"reach": name, "as_of": as_of.isoformat(), "candidates": candidates_json(cands)}
     (out_dir / f"{name}_{as_of.isoformat()}.json").write_text(json.dumps(result, indent=1))
     (out_dir / f"{name}_latest.json").write_text(json.dumps(result, indent=1))  # what the API serves
-    print(f"{name} as of {as_of}: {len(cands)} new-water candidate(s)")
+    reservoirs = sum(c.kind == "reservoir_level_change" for c in cands)
+    print(
+        f"{name} as of {as_of}: {len(cands) - reservoirs} possible barrier lake(s),"
+        f" {reservoirs} reservoir level change{'' if reservoirs == 1 else 's'}"
+    )
     for c in cands:
-        print(f"  km {c.km_along_reach:6.1f}  {c.lat:.4f},{c.lon:.4f}  {c.area_m2 / 1e6:.3f} km2  width {c.width_m} m")
+        dam = f"  ({c.near_dam_km} km from a dam)" if c.near_dam_km is not None else ""
+        print(
+            f"  km {c.km_along_reach:6.1f}  {c.lat:.4f},{c.lon:.4f}  {c.area_m2 / 1e6:.3f} km2  width {c.width_m} m"
+            f"  {c.kind}{dam}"
+        )
+
+
+def cmd_drain(args) -> None:
+    from datetime import date
+
+    from .drain import run_drain
+
+    as_of = date.fromisoformat(args.as_of) if args.as_of else None
+    lakes = load_lakes() if args.lake == "all" else [get_lake(args.lake)]
+    for lake in lakes:
+        r = run_drain(lake, Path(args.out), as_of)
+        latest = r["latest"] or {}
+        drop = f"{r['drop_fraction']:.0%}" if r["drop_fraction"] is not None else "-"
+        flag = "DRAINED" if r["drained"] else r["status"]
+        print(f"{lake.id:<16} {flag:<15} drop {drop:>5}  latest {latest.get('day') or '-'}  {r['note']}")
+    build_index(Path(args.out))
 
 
 def cmd_places(args) -> None:
@@ -203,6 +227,12 @@ def main(argv: list[str] | None = None) -> None:
     b.add_argument("--max-km", type=float, default=None)
     b.add_argument("--out", default="out")
     b.set_defaults(func=cmd_barrier)
+
+    dr = sub.add_parser("drain", help="check a lake for sudden drainage on the latest clear scene (needs its series)")
+    dr.add_argument("--lake", required=True, help="lake id from the catalogue, or 'all'")
+    dr.add_argument("--as-of", help="YYYY-MM-DD (default today); only scenes up to this date are used")
+    dr.add_argument("--out", default="out")
+    dr.set_defaults(func=cmd_drain)
 
     pl = sub.add_parser("places", help="index every named settlement in the region for search")
     pl.add_argument("--out", default="out")

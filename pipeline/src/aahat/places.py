@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .admin import assign, load_admin
 from .exposure import PLACES
 from .osm_extract import query
 
@@ -18,7 +19,11 @@ REGION = (75.4, 30.2, 79.2, 33.6)
 
 
 def build_places(out_dir: Path, bounds: tuple[float, float, float, float] = REGION) -> Path:
-    """Write places/index.json: [{osm, name, name_hi, place, lon, lat}] for named settlements, by name."""
+    """Write places/index.json: [{osm, name, name_hi, place, lon, lat, district, state}] for named
+    settlements, by name. District and state are null outside the mapped boundaries (e.g. Tibet)."""
+    # Boundaries first: building them from the raw extract (first run only) needs about 0.7 GB, which is
+    # released again before the filtered extract (another 1.3 GB) is loaded. The server has 2 GB.
+    areas = load_admin()
     rows = []
     seen = set()
     for el in query(bounds)["elements"]:
@@ -44,6 +49,9 @@ def build_places(out_dir: Path, bounds: tuple[float, float, float, float] = REGI
                 "lat": round(lat, 5),
             }
         )
+    # Many names repeat (Hamirpur is a town in Himachal and a district in Uttar Pradesh): say where each is.
+    for row, (district, state) in zip(rows, assign([(r["lon"], r["lat"]) for r in rows], areas)):
+        row |= {"district": district, "state": state}
     rows.sort(key=lambda r: (r["name"].lower(), r["osm"]))
     path = out_dir / "places" / "index.json"
     path.parent.mkdir(parents=True, exist_ok=True)

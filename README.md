@@ -27,6 +27,17 @@ Outputs land in `pipeline/out/lakes/<lake-id>/`: `series.json` (yearly areas wit
 `<year>.geojson` (lake outline), and `<year>.png` quicklooks with `--quicklook`. Re-running `series` for some
 years merges into the existing `series.json`. `summary` writes `out/lakes/index.json` for the API and maps.
 
+**Evidence:** every yearly record (in `series.json`, the year's GeoJSON properties and the yearly rows of
+`index.json`) lists the Sentinel-2 scenes its outline was mapped from: `scene_ids` (Earth Search item ids) and
+`scene_days`. Years computed before this was recorded have none until they are re-run.
+
+Other commands: `aahat risk`, `aahat downstream`, `aahat barrier`, `aahat drain` (sections below), and
+`aahat places`, which writes `out/places/index.json`: every named settlement in the region for search, each
+with its `district` and `state` so two Hamirpurs can be told apart. Those come from OpenStreetMap admin
+boundaries (admin_level 5 and 4) in the Geofabrik extract, assembled once into
+`~/.cache/aahat/osm/admin_*.json` (about 7 s and 0.7 GB of memory, first run only) and matched by
+point-in-polygon; places outside every mapped district (Tibet) get `null`.
+
 DEM tiles are cached whole under `~/.cache/aahat` (override with `AAHAT_CACHE_DIR`, e.g. `/tmp/aahat` on Lambda).
 
 ### How lake mapping works
@@ -129,8 +140,28 @@ dammed lake is a blob). Only scenes up to `--as-of` are used. Reads at 20 m from
 - **Replay, Sedongpu (Yarlung Tsangpo), 31 Oct 2018:** three candidates on the lake backed up behind the
   debris dam that formed on 29 Oct ([SANDRP](https://sandrp.in/2018/10/19/landslide-dam-on-tsangpo-creates-flood-disaster-risk-for-siang/)).
 - **False-positive check:** 0 candidates along the first 30 km below Gepang Gath as of 8 Oct 2026.
+- **Reservoirs:** a reservoir refilling looks the same as a new lake (the scan below Lam Dal flagged 0.107 km²
+  at the head of the Chamera reservoir on the Ravi, 8 km from the dam). Each candidate gets `near_dam_km`, the
+  straight-line distance to the nearest OpenStreetMap dam, weir or hydro plant within 12 km, and a `kind`:
+  `reservoir_level_change` if there is one, else `possible_barrier_lake`. Both stay in the JSON; the summary
+  line counts them separately.
 - Limits: lakes narrower than about 3 pixels (60 m) are missed (e.g. Kunwari, Uttarakhand, ~50 m wide), and
   cloud during the monsoon hides short-lived lakes. Area counts only the new water, not the old channel inside it.
+
+### Sudden drainage
+
+`uv run aahat drain --lake <id|all> [--as-of YYYY-MM-DD]` (after `series`) asks whether a lake has partly
+emptied since its season outline was mapped, which is what a lake that burst looks like from above. It maps
+water on the newest clear scene of the last 12 days, takes the lake at its seed point, and compares:
+drop = 1 − latest area / season area, against the latest season up to `--as-of` whose lake was fully seen.
+
+`drained` is true only if the drop exceeds 30% and 3× the combined shoreline uncertainty of the two outlines,
+**and** that one scene observed at least 90% of the season outline's pixels. Cloud, cloud shadow and terrain
+shadow are unknown, never dry, so a cloud over the lake cannot look like a drained lake (`no_clear_scene`).
+If more than 20% of the outline is snow or ice the lake is freezing over, not emptying: `frozen_or_snow`,
+never flagged, and older scenes are not consulted either. Writes `out/lakes/<id>/drain.json` (season year and
+area, the latest scene's day, item id, area and coverage, drop, threshold, status, note) and a `drain`
+summary per lake in `lakes/index.json`.
 
 ## Data
 

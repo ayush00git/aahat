@@ -1,6 +1,14 @@
 import json
 
+from shapely.geometry import box
+
 from aahat import places
+from aahat.admin import AdminArea
+
+AREAS = [
+    AdminArea("Himachal Pradesh", None, 4, None, box(76, 31, 77, 31.9)),
+    AdminArea("Hamirpur", None, 5, "Himachal Pradesh", box(76.4, 31.6, 76.6, 31.9)),
+]
 
 
 def test_build_places_keeps_named_settlements_sorted(tmp_path, monkeypatch):
@@ -23,6 +31,10 @@ def test_build_places_keeps_named_settlements_sorted(tmp_path, monkeypatch):
         },
     ]
     monkeypatch.setattr(places, "query", lambda bounds: {"elements": elements})
+    monkeypatch.setattr(places, "load_admin", lambda: AREAS)
     rows = json.loads(places.build_places(tmp_path).read_text())["places"]
     assert [r["name"] for r in rows] == ["Anu", "Badi", "Hamirpur"]
     assert rows[0]["name_hi"] == "अणु" and rows[1]["osm"] == "way/5" and rows[1]["lat"] == 32.1
+    by_name = {r["name"]: r for r in rows}
+    assert (by_name["Hamirpur"]["district"], by_name["Hamirpur"]["state"]) == ("Hamirpur", "Himachal Pradesh")
+    assert (by_name["Badi"]["district"], by_name["Badi"]["state"]) == (None, None)  # outside every boundary

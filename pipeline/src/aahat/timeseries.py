@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -43,6 +43,10 @@ class LakeYear:
     first_day: str | None
     last_day: str | None
     params: dict
+    # Evidence: the Sentinel-2 items the outline was mapped from, and their dates. Empty for years
+    # computed before these were recorded (old series.json files still load).
+    scene_ids: list[str] = field(default_factory=list)
+    scene_days: list[str] = field(default_factory=list)
 
 
 def lake_focus(grid, seed_xy: tuple[float, float], radius_m: float) -> np.ndarray:
@@ -77,9 +81,12 @@ def lake_year(
     seed = point_in_crs(lake.lon, lake.lat, grid.crs)
     ext = extract_lake(comp, seed, p)
     days = (used[0].day.isoformat(), used[-1].day.isoformat())
+    evidence = {"scene_ids": [s.item_id for s in used], "scene_days": [s.day.isoformat() for s in used]}
     if ext is None:
         return (
-            LakeYear(lake.id, year, "not_found", None, None, None, None, len(found), len(used), *days, asdict(p)),
+            LakeYear(
+                lake.id, year, "not_found", None, None, None, None, len(found), len(used), *days, asdict(p), **evidence
+            ),
             comp,
             None,
         )
@@ -97,6 +104,7 @@ def lake_year(
         len(used),
         *days,
         asdict(p),
+        **evidence,
     )
     return rec, comp, ext
 
@@ -156,11 +164,9 @@ def build_index(out_dir: Path) -> dict:
         ]
         fc = {"type": "FeatureCollection", "features": outlines}
         (path.parent / "outlines.geojson").write_text(json.dumps(fc, ensure_ascii=False))
-        years = [
-            {k: r.get(k) for k in ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear")}
-            for r in s["years"]
-        ]
-        measured = [r for r in years if r["area_m2"] is not None]
+        years = [{k: r.get(k) for k in YEAR_KEYS} | _evidence(r) for r in s["years"]]
+        # first/latest repeat a year row: leave the scene lists out of them to keep the index small
+        measured = [{k: r[k] for k in YEAR_KEYS} for r in years if r["area_m2"] is not None]
         downstream = _downstream_summary(path.parent)
         risk_path = path.parent / "risk.json"
         latest_risk = json.loads(risk_path.read_text()).get("latest") if risk_path.exists() else None
@@ -180,11 +186,35 @@ def build_index(out_dir: Path) -> dict:
                 "latest": measured[-1] if measured else None,
                 "risk": risk,
                 "downstream": downstream,
+                "drain": _drain_summary(path.parent),
             }
         )
     index = {"generated_at": datetime.now(UTC).isoformat(timespec="seconds"), "lakes": lakes}
     (out_dir / "lakes" / "index.json").write_text(json.dumps(index, indent=1, ensure_ascii=False))
     return index
+
+
+YEAR_KEYS = ("year", "status", "area_m2", "uncertainty_m2", "coverage", "scenes_clear")
+
+
+def _evidence(rec: dict) -> dict:
+    """Which scenes a year's outline came from; nothing for years computed before that was recorded."""
+    return {k: rec[k] for k in ("scene_ids", "scene_days") if rec.get(k)}
+
+
+def _drain_summary(lake_dir: Path) -> dict | None:
+    """The latest sudden-drain check (see drain.py), if one was run."""
+    path = lake_dir / "drain.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    return {
+        "as_of": d["as_of"],
+        "drained": d["drained"],
+        "drop_fraction": d["drop_fraction"],
+        "status": d["status"],
+        "latest_day": (d.get("latest") or {}).get("day"),
+    }
 
 
 def _downstream_summary(lake_dir: Path) -> dict | None:

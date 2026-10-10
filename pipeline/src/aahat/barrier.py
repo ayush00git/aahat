@@ -11,6 +11,10 @@ lake-shaped body of water on the river line. Per window along a river reach:
    of the river line, at least `min_area_m2` and `min_width_m` wide (a river widening along its
    banks makes long slivers, a dammed lake a blob).
 
+A reservoir refilling behind a dam looks exactly the same (Chamera on the Ravi, October 2026), so
+each candidate near a mapped dam, weir or hydro plant is tagged `reservoir_level_change` instead of
+`possible_barrier_lake`.
+
 Only scenes up to `as_of` are used, so a replay of a past date shows what could have been seen then.
 Reads at 20 m from COG overviews to keep downloads small: lakes of interest are tens of pixels.
 """
@@ -27,7 +31,8 @@ from scipy import ndimage
 from shapely.geometry import LineString, Point
 
 from .dem import Terrain
-from .geo import Grid, from_wgs84, grid_around, to_wgs84
+from .exposure import fetch_assets
+from .geo import Grid, from_wgs84, grid_around, to_wgs84, utm_crs
 from .stac import find_scenes
 from .water import WaterParams, composite
 
@@ -49,6 +54,8 @@ class BarrierParams:
     min_width_m: float = 60.0
     max_scenes_now: int = 4
     max_scenes_baseline: int = 8
+    # Chamera dam is 8.4 km in a straight line from the head of its reservoir, where the refill showed.
+    dam_radius_km: float = 12.0
 
 
 @dataclass
@@ -61,6 +68,8 @@ class Candidate:
     baseline_water_freq: float  # mean over the blob in the baseline period
     now_scenes: list[str]
     as_of: str
+    near_dam_km: float | None = None  # straight line to the nearest mapped dam/weir/hydro plant within reach
+    kind: str = "possible_barrier_lake"  # | "reservoir_level_change"
 
 
 def new_water_blobs(
@@ -142,8 +151,6 @@ def scan_reach(
     reach_wgs84: LineString, as_of: date, p: BarrierParams = BarrierParams(), max_km: float | None = None
 ) -> list[Candidate]:
     """Scan windows every p.spacing_km along a river reach (lon/lat line) for new barrier lakes."""
-    from .geo import utm_crs
-
     start = reach_wgs84.coords[0]
     crs = utm_crs(*start)
     reach_xy = from_wgs84(reach_wgs84, crs)
@@ -162,7 +169,38 @@ def scan_reach(
                 seen.add(key)
                 cand.km_along_reach = round(reach_xy.project(from_wgs84(Point(cand.lon, cand.lat), crs)) / 1000, 2)
                 candidates.append(cand)
+    tag_reservoirs(candidates, p)
     return sorted(candidates, key=lambda c: c.km_along_reach)
+
+
+def nearest_dam_km(lon: float, lat: float, radius_km: float) -> float | None:
+    """Straight-line km from a point to the nearest OSM dam, weir or hydro plant within `radius_km`
+    (to the nearest point of its outline, not its centre: dams are long). None if there is none.
+
+    Every "hydro" asset counts, not only waterway=dam: Chamera Dam is mapped as a power plant.
+    """
+    dlat = radius_km / 111.0
+    dlon = dlat / np.cos(np.radians(lat))
+    crs = utm_crs(lon, lat)
+    here = from_wgs84(Point(lon, lat), crs)
+    dists = [
+        here.distance(from_wgs84(a.geometry, crs)) / 1000
+        for a in fetch_assets((lon - dlon, lat - dlat, lon + dlon, lat + dlat))
+        if a.kind == "hydro"
+    ]
+    near = [d for d in dists if d <= radius_km]
+    return round(min(near), 2) if near else None
+
+
+def tag_reservoirs(cands: list[Candidate], p: BarrierParams = BarrierParams()) -> None:
+    """Mark candidates near a dam as a reservoir changing level rather than a possible barrier lake."""
+    for c in cands:
+        try:
+            c.near_dam_km = nearest_dam_km(c.lon, c.lat, p.dam_radius_km)
+        except Exception as e:  # noqa: BLE001 - no OSM answer (Overpass down): leave it a possible barrier lake
+            log.warning("dam lookup failed for %.4f,%.4f: %s", c.lat, c.lon, e)
+            continue
+        c.kind = "reservoir_level_change" if c.near_dam_km is not None else "possible_barrier_lake"
 
 
 def candidates_json(cands: list[Candidate]) -> list[dict]:
