@@ -5,6 +5,8 @@ OnFailure=aahat-notify-failure@%n.service
 [Service]
 User=aahat
 EnvironmentFile=/srv/aahat/api.env
+# Optional Claude API key for /ask and researcher jobs (anthropic-key.sh)
+EnvironmentFile=-/srv/aahat/anthropic.env
 ExecStart=/srv/aahat/bin/aahat-server -addr 127.0.0.1:8080 -data /srv/aahat/data -store /srv/aahat/state/store.json
 Restart=on-failure
 [Install]

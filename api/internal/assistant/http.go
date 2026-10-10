@@ -56,7 +56,7 @@ func Handler(s *Service, perMin int) http.Handler {
 // NotConfigured answers 503: no Bedrock model is set.
 func NotConfigured() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		writeError(w, http.StatusServiceUnavailable, "the assistant is not configured (AAHAT_BEDROCK_MODEL is not set)")
+		writeError(w, http.StatusServiceUnavailable, "the assistant is not configured (set AAHAT_ANTHROPIC_API_KEY or AAHAT_BEDROCK_MODEL)")
 	})
 }
 

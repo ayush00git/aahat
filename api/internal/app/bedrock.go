@@ -17,12 +17,23 @@ import (
 	"github.com/ayush00git/aahat/api/internal/research"
 )
 
-// Bedrock sets up the Claude client from environment variables; without a model it returns nil
+// Bedrock sets up the Claude client (Anthropic API or Amazon Bedrock) from environment variables; without a key or model it returns nil
 // and the features that need it stay off:
 //
 //	AAHAT_BEDROCK_MODEL    model or inference profile id, e.g. an "apac." or "global." Claude profile
 //	AAHAT_BEDROCK_REGION   region to call Bedrock in (default: the SDK's region, AWS_REGION)
 func Bedrock(ctx context.Context) (assistant.Converser, string, error) {
+	// An Anthropic API key takes precedence: same features, no Bedrock model access needed.
+	//
+	//	AAHAT_ANTHROPIC_API_KEY   API key (console.anthropic.com)
+	//	AAHAT_ANTHROPIC_MODEL     model id (default claude-sonnet-5-5)
+	if key := os.Getenv("AAHAT_ANTHROPIC_API_KEY"); key != "" {
+		model := os.Getenv("AAHAT_ANTHROPIC_MODEL")
+		if model == "" {
+			model = "claude-sonnet-5-5"
+		}
+		return &assistant.Anthropic{Key: key}, model, nil
+	}
 	model := os.Getenv("AAHAT_BEDROCK_MODEL")
 	if model == "" {
 		return nil, "", nil
